@@ -16,6 +16,7 @@ import {
   Film,
   Sparkles,
   ArrowRight,
+  Inbox,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -32,7 +33,6 @@ import {
 } from 'recharts';
 import { useFinance } from '../../context/FinanceContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { TransactionCategory } from '../../types/finance';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -49,7 +49,7 @@ export const DashboardView: React.FC = () => {
   const [donutFilter, setDonutFilter] = useState<'month' | '30days'>('month');
 
   // Category Icon helper
-  const getCategoryIcon = (category: TransactionCategory) => {
+  const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Food':
         return <Utensils className="w-3.5 h-3.5 text-amber-500" />;
@@ -61,12 +61,24 @@ export const DashboardView: React.FC = () => {
         return <Receipt className="w-3.5 h-3.5 text-purple-500" />;
       case 'Entertainment':
         return <Film className="w-3.5 h-3.5 text-emerald-500" />;
+      case 'Income':
+        return <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />;
       default:
         return <Sparkles className="w-3.5 h-3.5 text-slate-500" />;
     }
   };
 
   const recentTransactions = transactions.slice(0, 5);
+
+  // Dynamic highest expense category
+  const sortedCategories = [...categorySpending].sort((a, b) => b.amount - a.amount);
+  const highestCategory = sortedCategories[0];
+
+  // Dynamic average monthly savings
+  const avgMonthlySavings =
+    monthlyData.length > 0
+      ? Math.round(monthlyData.reduce((acc, curr) => acc + curr.savings, 0) / monthlyData.length)
+      : summary.savings;
 
   return (
     <div className="space-y-8">
@@ -104,7 +116,7 @@ export const DashboardView: React.FC = () => {
             <h3 className="text-2xl font-bold text-emerald-600 tracking-tight">
               {formatCurrency(summary.totalIncome)}
             </h3>
-            <p className="mt-1 text-xs text-slate-400 font-medium">Current cycle inflows</p>
+            <p className="mt-1 text-xs text-slate-400 font-medium">Recorded salary &amp; inflows</p>
           </div>
         </div>
 
@@ -122,7 +134,7 @@ export const DashboardView: React.FC = () => {
             <h3 className="text-2xl font-bold text-rose-600 tracking-tight">
               {formatCurrency(summary.totalExpenses)}
             </h3>
-            <p className="mt-1 text-xs text-slate-400 font-medium">Current cycle outflows</p>
+            <p className="mt-1 text-xs text-slate-400 font-medium">Cumulative personal spending</p>
           </div>
         </div>
 
@@ -140,12 +152,9 @@ export const DashboardView: React.FC = () => {
             <h3 className="text-2xl font-bold text-indigo-600 tracking-tight">
               {formatCurrency(summary.savings)}
             </h3>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-600">
-                {summary.savingsRate}%
-              </span>
-              <span className="text-xs text-slate-400 font-medium">savings rate</span>
-            </div>
+            <p className="mt-1 text-xs text-slate-400 font-medium">
+              {summary.savingsRate}% of income saved
+            </p>
           </div>
         </div>
       </div>
@@ -162,7 +171,7 @@ export const DashboardView: React.FC = () => {
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-medium">
               <button
                 onClick={() => setDonutFilter('month')}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   donutFilter === 'month'
                     ? 'bg-white text-slate-900 shadow-xs font-semibold'
                     : 'text-slate-500 hover:text-slate-900'
@@ -172,7 +181,7 @@ export const DashboardView: React.FC = () => {
               </button>
               <button
                 onClick={() => setDonutFilter('30days')}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   donutFilter === '30days'
                     ? 'bg-white text-slate-900 shadow-xs font-semibold'
                     : 'text-slate-500 hover:text-slate-900'
@@ -183,63 +192,77 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
 
-          {/* Donut Chart with Center Total Spent */}
-          <div className="relative h-60 w-full flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categorySpending}
-                  dataKey="amount"
-                  nameKey="category"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={88}
-                  paddingAngle={3}
-                >
-                  {categorySpending.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke="#FFFFFF" strokeWidth={2} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(val: number) => [formatCurrency(val), 'Spent']}
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '12px',
-                    border: '1px solid #E2E8F0',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-
-            {/* Center Label Overlay */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-xs font-medium text-slate-400">Total Spent</span>
-              <span className="text-xl font-bold text-slate-900">
-                {formatCurrency(summary.totalExpenses)}
-              </span>
-            </div>
-          </div>
-
-          {/* Category breakdown legend */}
-          <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
-            {categorySpending.map((cat) => (
-              <div key={cat.category} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: cat.color }}
-                  />
-                  <span className="text-slate-600 font-medium truncate">{cat.category}</span>
-                </div>
-                <span className="font-semibold text-slate-900 ml-1">
-                  {formatCurrency(cat.amount)}
-                </span>
+          {categorySpending.length === 0 ? (
+            <div className="h-60 w-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 rounded-xl my-auto">
+              <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-2">
+                <PieChartIcon className="w-5 h-5" />
               </div>
-            ))}
-          </div>
+              <p className="text-xs font-bold text-slate-700">No expense data yet</p>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
+                Add an expense transaction to view category spending breakdown
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Donut Chart with Center Total Spent */}
+              <div className="relative h-60 w-full flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categorySpending}
+                      dataKey="amount"
+                      nameKey="category"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={88}
+                      paddingAngle={3}
+                    >
+                      {categorySpending.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="#FFFFFF" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(val: number) => [formatCurrency(val), 'Spent']}
+                      contentStyle={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '12px',
+                        border: '1px solid #E2E8F0',
+                        fontSize: '12px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Center Label Overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-xs font-medium text-slate-400">Total Spent</span>
+                  <span className="text-xl font-bold text-slate-900">
+                    {formatCurrency(summary.totalExpenses)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Category breakdown legend */}
+              <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
+                {categorySpending.map((cat) => (
+                  <div key={cat.category} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      <span className="text-slate-600 font-medium truncate">{cat.category}</span>
+                    </div>
+                    <span className="font-semibold text-slate-900 ml-1">
+                      {formatCurrency(cat.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Monthly Overview Grouped Bar Chart */}
@@ -249,62 +272,76 @@ export const DashboardView: React.FC = () => {
               <h4 className="font-bold text-slate-900 text-sm">Monthly Overview</h4>
               <p className="text-xs text-slate-400">Comparing Inflow vs Outflow</p>
             </div>
-            <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
-              Jul - Sep
-            </span>
+            {monthlyData.length > 0 && (
+              <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
+                Dynamic Months
+              </span>
+            )}
           </div>
 
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  axisLine={{ stroke: '#E2E8F0' }}
-                  tick={{ fill: '#64748B', fontSize: 12 }}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: '#64748B', fontSize: 11 }}
-                  tickFormatter={(val) => `₹${val / 1000}k`}
-                />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '12px',
-                    border: '1px solid #E2E8F0',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                  }}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-                  iconType="circle"
-                />
-                <Bar
-                  dataKey="income"
-                  name="Income"
-                  fill="#10B981"
-                  radius={[6, 6, 0, 0]}
-                  barSize={18}
-                />
-                <Bar
-                  dataKey="expenses"
-                  name="Expenses"
-                  fill="#F43F5E"
-                  radius={[6, 6, 0, 0]}
-                  barSize={18}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {monthlyData.length === 0 ? (
+            <div className="h-64 w-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 rounded-xl my-auto">
+              <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-2">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-700">No monthly trends yet</p>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
+                Transactions recorded with dates will populate monthly comparison bars
+              </p>
+            </div>
+          ) : (
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    axisLine={{ stroke: '#E2E8F0' }}
+                    tick={{ fill: '#64748B', fontSize: 12 }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: '#64748B', fontSize: 11 }}
+                    tickFormatter={(val) => `₹${val >= 1000 ? `${val / 1000}k` : val}`}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '12px',
+                      border: '1px solid #E2E8F0',
+                      fontSize: '12px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                    iconType="circle"
+                  />
+                  <Bar
+                    dataKey="income"
+                    name="Income"
+                    fill="#10B981"
+                    radius={[6, 6, 0, 0]}
+                    barSize={18}
+                  />
+                  <Bar
+                    dataKey="expenses"
+                    name="Expenses"
+                    fill="#F43F5E"
+                    radius={[6, 6, 0, 0]}
+                    barSize={18}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>Average Monthly Savings</span>
-            <span className="font-bold text-slate-900">₹22,833</span>
+            <span className="font-bold text-slate-900">{formatCurrency(avgMonthlySavings)}</span>
           </div>
         </div>
 
@@ -317,7 +354,7 @@ export const DashboardView: React.FC = () => {
             <div className="space-y-3">
               <button
                 onClick={() => setAddTransactionOpen(true)}
-                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group"
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
@@ -335,7 +372,7 @@ export const DashboardView: React.FC = () => {
 
               <button
                 onClick={() => setAddSplitExpenseOpen(true)}
-                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group"
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
@@ -353,7 +390,7 @@ export const DashboardView: React.FC = () => {
 
               <button
                 onClick={() => setActiveTab('analytics')}
-                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group"
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
@@ -363,7 +400,7 @@ export const DashboardView: React.FC = () => {
                     <h5 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                       View Analytics
                     </h5>
-                    <p className="text-[11px] text-slate-400">Deep-dive category trends & insights</p>
+                    <p className="text-[11px] text-slate-400">Deep-dive category trends &amp; insights</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
@@ -371,7 +408,7 @@ export const DashboardView: React.FC = () => {
 
               <button
                 onClick={() => setActiveTab('settings')}
-                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group"
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/60 hover:bg-indigo-50/50 transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
@@ -390,7 +427,7 @@ export const DashboardView: React.FC = () => {
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-center">
-            <span className="text-[11px] text-slate-400">All data automatically syncs locally</span>
+            <span className="text-[11px] text-slate-400">Live Supabase synchronization</span>
           </div>
         </div>
       </div>
@@ -407,65 +444,84 @@ export const DashboardView: React.FC = () => {
               </div>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
               >
                 <span>View All</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                    <th className="pb-3">Date</th>
-                    <th className="pb-3">Description</th>
-                    <th className="pb-3">Category</th>
-                    <th className="pb-3 text-right">Amount</th>
-                    <th className="pb-3 text-right">Type</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100/70">
-                  {recentTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
-                      <td className="py-3 font-medium text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <span className="p-1 rounded-lg bg-slate-100">
-                            {getCategoryIcon(tx.category)}
+            {transactions.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl p-6 my-2">
+                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center mb-3">
+                  <Inbox className="w-6 h-6 text-indigo-500" />
+                </div>
+                <h5 className="font-bold text-slate-800 text-sm">No transactions yet</h5>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  No transactions yet. Add your first transaction above to get started!
+                </p>
+                <button
+                  onClick={() => setAddTransactionOpen(true)}
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Add First Transaction</span>
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                      <th className="pb-3">Date</th>
+                      <th className="pb-3">Title</th>
+                      <th className="pb-3">Category</th>
+                      <th className="pb-3 text-right">Amount</th>
+                      <th className="pb-3 text-right">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/70">
+                    {recentTransactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                        <td className="py-3 font-medium text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-lg bg-slate-100">
+                              {getCategoryIcon(tx.category)}
+                            </span>
+                            <span className="truncate max-w-[200px]">{tx.title}</span>
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+                            {tx.category}
                           </span>
-                          <span className="truncate max-w-[200px]">{tx.description}</span>
-                        </div>
-                      </td>
-                      <td className="py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
-                          {tx.category}
-                        </span>
-                      </td>
-                      <td
-                        className={`py-3 text-right font-bold whitespace-nowrap ${
-                          tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'
-                        }`}
-                      >
-                        {tx.type === 'income' ? '+' : '-'}
-                        {formatCurrency(tx.amount)}
-                      </td>
-                      <td className="py-3 text-right">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            tx.type === 'income'
-                              ? 'bg-emerald-50 text-emerald-600'
-                              : 'bg-rose-50 text-rose-600'
+                        </td>
+                        <td
+                          className={`py-3 text-right font-bold whitespace-nowrap ${
+                            tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'
                           }`}
                         >
-                          {tx.type}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          {tx.type === 'income' ? '+' : '-'}
+                          {formatCurrency(tx.amount)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              tx.type === 'income'
+                                ? 'bg-emerald-50 text-emerald-600'
+                                : 'bg-rose-50 text-rose-600'
+                            }`}
+                          >
+                            {tx.type}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
@@ -485,7 +541,7 @@ export const DashboardView: React.FC = () => {
               </div>
               <button
                 onClick={() => setActiveTab('split-bills')}
-                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
               >
                 Open
               </button>
@@ -496,18 +552,24 @@ export const DashboardView: React.FC = () => {
                 Net Status
               </span>
               <h3 className="text-xl font-extrabold text-emerald-700 mt-0.5">
-                You are owed {formatCurrency(splitSummary.totalOthersOweYou)}
+                {splitSummary.totalOthersOweYou > 0
+                  ? `You are owed ${formatCurrency(splitSummary.totalOthersOweYou)}`
+                  : splitSummary.totalYouOwe > 0
+                  ? `You owe ${formatCurrency(splitSummary.totalYouOwe)}`
+                  : 'All group expenses are settled'}
               </h3>
               <p className="text-xs text-emerald-600/90 mt-1 font-medium">
-                Apartment Flatmates • Rahul owes {formatCurrency(200)}
+                {splitSummary.totalOthersOweYou > 0
+                  ? 'Pending collections from active groups'
+                  : 'No active pending balances'}
               </p>
             </div>
 
             <button
               onClick={() => setActiveTab('split-bills')}
-              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
-              Manage Groups & Settle Up
+              Manage Groups &amp; Settle Up
             </button>
           </div>
 
@@ -519,24 +581,52 @@ export const DashboardView: React.FC = () => {
             </div>
 
             <ul className="space-y-2.5 text-xs text-slate-600">
-              <li className="flex items-start gap-2">
-                <span className="text-emerald-500 font-bold shrink-0">🎯</span>
-                <span>
-                  High savings rate: <strong className="text-slate-900">{summary.savingsRate}%</strong> of income saved this month.
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-500 font-bold shrink-0">🍔</span>
-                <span>
-                  <strong className="text-slate-900">Food</strong> is your primary expense at <strong className="text-slate-900">₹2,100</strong> (38.2%).
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-indigo-500 font-bold shrink-0">👥</span>
-                <span>
-                  Pending collection: <strong className="text-slate-900">₹200</strong> in split groups.
-                </span>
-              </li>
+              {transactions.length === 0 ? (
+                <>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 font-bold shrink-0">&bull;</span>
+                    <span>
+                      Start logging your expenses and income to see personalized AI financial insights.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-500 font-bold shrink-0">&bull;</span>
+                    <span>
+                      Use keywords like <strong className="text-slate-800">Swiggy, Uber, Amazon</strong> for auto-categorization.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-500 font-bold shrink-0">&bull;</span>
+                    <span>
+                      All transactions are securely stored with Supabase Row Level Security.
+                    </span>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-500 font-bold shrink-0">🎯</span>
+                    <span>
+                      Savings rate: <strong className="text-slate-900">{summary.savingsRate}%</strong> of income saved.
+                    </span>
+                  </li>
+                  {highestCategory && (
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-500 font-bold shrink-0">📊</span>
+                      <span>
+                        <strong className="text-slate-900">{highestCategory.category}</strong> is your primary expense at{' '}
+                        <strong className="text-slate-900">{formatCurrency(highestCategory.amount)}</strong> ({highestCategory.percentage}%).
+                      </span>
+                    </li>
+                  )}
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-500 font-bold shrink-0">⚡</span>
+                    <span>
+                      <strong className="text-slate-900">{transactions.length}</strong> transactions logged in Supabase.
+                    </span>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>

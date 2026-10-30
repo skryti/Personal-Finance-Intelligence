@@ -4,6 +4,7 @@ import {
   Filter,
   Plus,
   Trash2,
+  Edit2,
   X,
   Utensils,
   ShoppingBag,
@@ -14,21 +15,28 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Lightbulb,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
-import { TransactionCategory, TransactionType } from '../../types/finance';
+import { Transaction, TransactionCategory, TransactionType } from '../../types/finance';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { detectCategoryFromKeyword } from '../../utils/autoCategorize';
 
 export const TransactionsView: React.FC = () => {
   const {
     transactions,
+    loadingTransactions,
+    transactionsError,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
     summary,
     categorySpending,
     isAddTransactionOpen,
     setAddTransactionOpen,
+    editingTransaction,
+    setEditingTransaction,
   } = useFinance();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,19 +44,35 @@ export const TransactionsView: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('All');
 
   // Modal form states
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
-  const [category, setCategory] = useState<TransactionCategory>('Food');
+  const [category, setCategory] = useState<string>('Food');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
   const [autoDetected, setAutoDetected] = useState<string | null>(null);
   const [manualOverride, setManualOverride] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Real-time keyword auto-detection
+  // Sync form when editingTransaction changes
   useEffect(() => {
-    if (!manualOverride && description.trim().length > 1) {
-      const detection = detectCategoryFromKeyword(description);
+    if (editingTransaction) {
+      setTitle(editingTransaction.title);
+      setAmount(editingTransaction.amount.toString());
+      setType(editingTransaction.type);
+      setCategory(editingTransaction.category);
+      setDate(editingTransaction.date);
+      setAutoDetected(null);
+      setManualOverride(true);
+      setSubmitError(null);
+    }
+  }, [editingTransaction]);
+
+  // Real-time keyword auto-detection on title change (only in add mode or before manual override)
+  useEffect(() => {
+    if (!manualOverride && title.trim().length > 1 && !editingTransaction) {
+      const detection = detectCategoryFromKeyword(title);
       if (detection.category !== 'Other') {
         setCategory(detection.category);
         setAutoDetected(detection.matchedKeyword || null);
@@ -61,52 +85,100 @@ export const TransactionsView: React.FC = () => {
         setAutoDetected(null);
       }
     }
-  }, [description, manualOverride]);
+  }, [title, manualOverride, editingTransaction]);
 
-  const handleOpenModal = () => {
-    setDescription('');
+  const handleOpenAddModal = () => {
+    setEditingTransaction(null);
+    setTitle('');
     setAmount('');
     setType('expense');
     setCategory('Food');
     setDate(new Date().toISOString().split('T')[0]);
-    setNotes('');
     setAutoDetected(null);
     setManualOverride(false);
+    setSubmitError(null);
     setAddTransactionOpen(true);
   };
 
-  const handleCategorySelect = (newCat: TransactionCategory) => {
+  const handleOpenEditModal = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setAddTransactionOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setAddTransactionOpen(false);
+    setEditingTransaction(null);
+    setSubmitError(null);
+  };
+
+  const handleCategorySelect = (newCat: string) => {
     setCategory(newCat);
     setManualOverride(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim() || !amount || Number(amount) <= 0) return;
+    const parsedAmount = parseFloat(amount);
+    if (!title.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
+      setSubmitError('Please enter a valid title and positive amount.');
+      return;
+    }
 
-    addTransaction({
-      description: description.trim(),
-      amount: parseFloat(amount),
-      type,
-      category,
-      date,
-      notes: notes.trim() || undefined,
-    });
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-    setAddTransactionOpen(false);
+    if (editingTransaction) {
+      const res = await updateTransaction(editingTransaction.id, {
+        title: title.trim(),
+        amount: parsedAmount,
+        type,
+        category,
+        date,
+      });
+
+      setIsSubmitting(false);
+      if (res.success) {
+        handleCloseModal();
+      } else {
+        setSubmitError(res.error || 'Failed to update transaction');
+      }
+    } else {
+      const res = await addTransaction({
+        title: title.trim(),
+        amount: parsedAmount,
+        type,
+        category,
+        date,
+      });
+
+      setIsSubmitting(false);
+      if (res.success) {
+        handleCloseModal();
+      } else {
+        setSubmitError(res.error || 'Failed to save transaction');
+      }
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this transaction?')) {
+      setDeletingId(id);
+      await deleteTransaction(id);
+      setDeletingId(null);
+    }
   };
 
   // Filter transactions
   const filteredTransactions = transactions.filter((tx) => {
     const matchesSearch =
-      tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tx.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.amount.toString().includes(searchTerm);
     const matchesCategory = selectedCategory === 'All' || tx.category === selectedCategory;
     const matchesType = selectedType === 'All' || tx.type === selectedType.toLowerCase();
     return matchesSearch && matchesCategory && matchesType;
   });
 
-  const getCategoryIcon = (cat: TransactionCategory) => {
+  const getCategoryIcon = (cat: string) => {
     switch (cat) {
       case 'Food':
         return <Utensils className="w-3.5 h-3.5 text-amber-500" />;
@@ -142,18 +214,25 @@ export const TransactionsView: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">Transactions Ledger</h2>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Real-time transaction tracking with automatic keyword detection
+            Real-time Supabase transactions with automatic keyword categorization
           </p>
         </div>
 
         <button
-          onClick={handleOpenModal}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
+          onClick={handleOpenAddModal}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Add Transaction</span>
         </button>
       </div>
+
+      {transactionsError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+          <span>Error loading transactions: {transactionsError}</span>
+        </div>
+      )}
 
       {/* Dual Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -190,7 +269,7 @@ export const TransactionsView: React.FC = () => {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:border-indigo-500 font-medium"
+                className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
               >
                 <option value="All">All Categories</option>
                 {categories.map((c) => (
@@ -205,7 +284,7 @@ export const TransactionsView: React.FC = () => {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:border-indigo-500 font-medium w-full sm:w-auto"
+              className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:border-indigo-500 font-medium w-full sm:w-auto cursor-pointer"
             >
               <option value="All">All Types</option>
               <option value="Expense">Expense Only</option>
@@ -220,20 +299,48 @@ export const TransactionsView: React.FC = () => {
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
                     <th className="py-3.5 px-4">Date</th>
-                    <th className="py-3.5 px-4">Description</th>
+                    <th className="py-3.5 px-4">Title</th>
                     <th className="py-3.5 px-4">Category</th>
                     <th className="py-3.5 px-4 text-right">Amount</th>
                     <th className="py-3.5 px-4 text-right">Type</th>
-                    <th className="py-3.5 px-4 text-center">Action</th>
+                    <th className="py-3.5 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/70">
-                  {filteredTransactions.length === 0 ? (
+                  {loadingTransactions ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
+                        <p className="font-semibold text-slate-600">Loading transactions from Supabase...</p>
+                      </td>
+                    </tr>
+                  ) : transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-14 text-center">
+                        <div className="max-w-sm mx-auto space-y-3">
+                          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
+                            <Receipt className="w-6 h-6 text-indigo-500" />
+                          </div>
+                          <h4 className="font-bold text-slate-800 text-sm">No transactions yet</h4>
+                          <p className="text-xs text-slate-500">
+                            No transactions yet. Add your first transaction above to get started!
+                          </p>
+                          <button
+                            onClick={handleOpenAddModal}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>Add Your First Transaction</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-400">
                         <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                        <p className="font-semibold text-slate-600">No transactions found</p>
-                        <p className="text-xs text-slate-400 mt-0.5">Try clearing your filters</p>
+                        <p className="font-semibold text-slate-600">No matching transactions</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Try adjusting your filters</p>
                       </td>
                     </tr>
                   ) : (
@@ -247,14 +354,7 @@ export const TransactionsView: React.FC = () => {
                             <span className="p-1.5 rounded-lg bg-slate-100 shrink-0">
                               {getCategoryIcon(tx.category)}
                             </span>
-                            <div>
-                              <p className="truncate max-w-[200px] sm:max-w-[260px]">{tx.description}</p>
-                              {tx.notes && (
-                                <p className="text-[11px] text-slate-400 font-normal truncate">
-                                  {tx.notes}
-                                </p>
-                              )}
-                            </div>
+                            <span className="truncate max-w-[200px] sm:max-w-[260px]">{tx.title}</span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
@@ -282,13 +382,27 @@ export const TransactionsView: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() => deleteTransaction(tx.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Delete transaction"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleOpenEditModal(tx)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                              title="Edit transaction"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              disabled={deletingId === tx.id}
+                              onClick={() => handleDelete(tx.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                              title="Delete transaction"
+                            >
+                              {deletingId === tx.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -346,65 +460,82 @@ export const TransactionsView: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
             <h3 className="font-bold text-slate-900 text-sm">Category Spending</h3>
             <div className="space-y-3">
-              {categorySpending.map((cat) => (
-                <div key={cat.category} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700">{cat.category}</span>
-                    <span className="font-bold text-slate-900">
-                      {formatCurrency(cat.amount)} ({cat.percentage}%)
-                    </span>
+              {categorySpending.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3 text-center">
+                  No expense category data recorded yet.
+                </p>
+              ) : (
+                categorySpending.map((cat) => (
+                  <div key={cat.category} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-700">{cat.category}</span>
+                      <span className="font-bold text-slate-900">
+                        {formatCurrency(cat.amount)} ({cat.percentage}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(cat.percentage, 100)}%`,
+                          backgroundColor: cat.color,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(cat.percentage, 100)}%`,
-                        backgroundColor: cat.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Add Transaction Modal with Keyword Auto-detection */}
+      {/* Add / Edit Transaction Modal */}
       {isAddTransactionOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-150">
             <button
-              onClick={() => setAddTransactionOpen(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              onClick={handleCloseModal}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Add Transaction</h3>
-            <p className="text-xs text-slate-400 mb-5">
-              Type description keywords (e.g. Swiggy, Uber, Flipkart) for smart auto-categorization
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              {editingTransaction
+                ? 'Update your transaction details in Supabase'
+                : 'Type description keywords (e.g. Swiggy, Uber, Flipkart) for smart auto-categorization'}
             </p>
 
+            {submitError && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-800 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              {/* Description */}
+              {/* Title / Description */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Description <span className="text-rose-500">*</span>
+                  Title / Description <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Swiggy dinner or Uber to office"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Swiggy dinner or Monthly Salary"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
                 />
                 {autoDetected && (
                   <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-indigo-600 font-medium">
                     <Lightbulb className="w-3.5 h-3.5" />
                     <span>
-                      Detected keyword <strong>"{autoDetected}"</strong> → Auto-assigned to{' '}
+                      Detected keyword <strong>"{autoDetected}"</strong> &rarr; Auto-assigned to{' '}
                       <strong>{category}</strong>
                     </span>
                   </div>
@@ -421,7 +552,7 @@ export const TransactionsView: React.FC = () => {
                     type="number"
                     step="any"
                     required
-                    min="1"
+                    min="0.01"
                     placeholder="e.g. 450"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
@@ -435,7 +566,7 @@ export const TransactionsView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setType('expense')}
-                      className={`flex-1 py-1.5 text-center font-semibold rounded-lg transition-all ${
+                      className={`flex-1 py-1.5 text-center font-semibold rounded-lg transition-all cursor-pointer ${
                         type === 'expense'
                           ? 'bg-white text-rose-600 shadow-xs'
                           : 'text-slate-500 hover:text-slate-900'
@@ -446,7 +577,7 @@ export const TransactionsView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setType('income')}
-                      className={`flex-1 py-1.5 text-center font-semibold rounded-lg transition-all ${
+                      className={`flex-1 py-1.5 text-center font-semibold rounded-lg transition-all cursor-pointer ${
                         type === 'income'
                           ? 'bg-white text-emerald-600 shadow-xs'
                           : 'text-slate-500 hover:text-slate-900'
@@ -469,7 +600,7 @@ export const TransactionsView: React.FC = () => {
                       key={cat}
                       type="button"
                       onClick={() => handleCategorySelect(cat)}
-                      className={`px-2 py-2 rounded-xl border text-center transition-all ${
+                      className={`px-2 py-2 rounded-xl border text-center transition-all cursor-pointer ${
                         category === cat
                           ? 'border-indigo-600 bg-indigo-50/60 text-indigo-700 font-bold'
                           : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -496,16 +627,18 @@ export const TransactionsView: React.FC = () => {
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setAddTransactionOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
+                  disabled={isSubmitting}
+                  className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  Save Transaction
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{editingTransaction ? 'Save Changes' : 'Save Transaction'}</span>
                 </button>
               </div>
             </form>

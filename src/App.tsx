@@ -1,4 +1,5 @@
 import React from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -8,6 +9,7 @@ import { TransactionsView } from './components/transactions/TransactionsView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { SplitBillsView } from './components/split/SplitBillsView';
 import { SettingsView } from './components/settings/SettingsView';
+import { LoginView } from './components/auth/LoginView';
 
 const MainContent: React.FC = () => {
   const { activeTab } = useFinance();
@@ -48,7 +50,23 @@ const MainContent: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-semibold text-slate-500">Checking authentication...</p>
+      </div>
+    );
+  }
+
+  // When not logged in, display the landing / sign-in screen
+  if (!session) {
+    return <LoginView />;
+  }
+
   return (
     <FinanceProvider>
       <MainContent />
@@ -56,4 +74,10 @@ export const App: React.FC = () => {
   );
 };
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}

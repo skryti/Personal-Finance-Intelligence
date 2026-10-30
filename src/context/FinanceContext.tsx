@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Transaction,
   SplitGroup,
@@ -11,17 +11,31 @@ import {
   TabType,
 } from '../types/finance';
 import {
-  INITIAL_TRANSACTIONS,
   INITIAL_GROUPS,
   INITIAL_SPLIT_EXPENSES,
   INITIAL_SETTLEMENTS,
-  INITIAL_MONTHLY_DATA,
 } from '../data/initialMockData';
-import { calculateFinancialSummary, calculateCategorySpending } from '../utils/calculations';
+import {
+  calculateFinancialSummary,
+  calculateCategorySpending,
+  calculateMonthlyData,
+} from '../utils/calculations';
 import { calculateSplitLedgerSummary } from '../utils/splitLedger';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
+
+interface TransactionInput {
+  title: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  date: string;
+}
 
 interface FinanceContextType {
   transactions: Transaction[];
+  loadingTransactions: boolean;
+  transactionsError: string | null;
   splitGroups: SplitGroup[];
   splitExpenses: SplitExpense[];
   settlements: Settlement[];
@@ -34,6 +48,7 @@ interface FinanceContextType {
   splitSummary: SplitLedgerSummary;
 
   isAddTransactionOpen: boolean;
+  editingTransaction: Transaction | null;
   isCreateGroupOpen: boolean;
   isAddSplitExpenseOpen: boolean;
   isSettleUpOpen: boolean;
@@ -41,12 +56,15 @@ interface FinanceContextType {
   setActiveTab: (tab: TabType) => void;
   setSelectedGroupId: (id: string | null) => void;
   setAddTransactionOpen: (open: boolean) => void;
+  setEditingTransaction: (tx: Transaction | null) => void;
   setCreateGroupOpen: (open: boolean) => void;
   setAddSplitExpenseOpen: (open: boolean) => void;
   setSettleUpOpen: (open: boolean) => void;
 
-  addTransaction: (tx: Omit<Transaction, 'id'>) => void;
-  deleteTransaction: (id: string) => void;
+  fetchTransactions: () => Promise<void>;
+  addTransaction: (tx: TransactionInput) => Promise<{ success: boolean; error?: string }>;
+  updateTransaction: (id: string, tx: TransactionInput) => Promise<{ success: boolean; error?: string }>;
+  deleteTransaction: (id: string) => Promise<{ success: boolean; error?: string }>;
   createSplitGroup: (group: Omit<SplitGroup, 'id' | 'createdAt'>) => void;
   addSplitExpense: (expense: Omit<SplitExpense, 'id'>) => void;
   recordSettlement: (settlement: Omit<Settlement, 'id'>) => void;
@@ -55,17 +73,14 @@ interface FinanceContextType {
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'pfi_store_v1';
+const STORAGE_KEY = 'pfi_store_v2';
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    try {
-      const stored = localStorage.getItem(`${STORAGE_KEY}_transactions`);
-      return stored ? JSON.parse(stored) : INITIAL_TRANSACTIONS;
-    } catch {
-      return INITIAL_TRANSACTIONS;
-    }
-  });
+  const { user } = useAuth();
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState<boolean>(true);
+  const [transactionsError, setTransactionsError] = useState<string | null>(null);
 
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>(() => {
     try {
@@ -98,72 +113,218 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(INITIAL_GROUPS[0]?.id || null);
 
   const [isAddTransactionOpen, setAddTransactionOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isCreateGroupOpen, setCreateGroupOpen] = useState(false);
   const [isAddSplitExpenseOpen, setAddSplitExpenseOpen] = useState(false);
   const [isSettleUpOpen, setSettleUpOpen] = useState(false);
 
-  // Sync to localStorage
+  // Sync split bill ledger to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(`${STORAGE_KEY}_transactions`, JSON.stringify(transactions));
       localStorage.setItem(`${STORAGE_KEY}_groups`, JSON.stringify(splitGroups));
       localStorage.setItem(`${STORAGE_KEY}_expenses`, JSON.stringify(splitExpenses));
       localStorage.setItem(`${STORAGE_KEY}_settlements`, JSON.stringify(settlements));
     } catch (e) {
       console.error('Storage sync error', e);
     }
-  }, [transactions, splitGroups, splitExpenses, settlements]);
+  }, [splitGroups, splitExpenses, settlements]);
 
-  // Derived calculations
+  // Fetch transactions from Supabase
+  const fetchTransactions = useCallback(async () => {
+    if (!user) {
+      setTransactions([]);
+      setLoadingTransactions(false);
+      return;
+    }
+
+    setLoadingTransactions(true);
+    setTransactionsError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching transactions from Supabase:', error.message);
+        setTransactionsError(error.message);
+      } else if (data) {
+        const parsed: Transaction[] = data.map((item) => ({
+          id: item.id,
+          user_id: item.user_id,
+          title: item.title,
+          amount: typeof item.amount === 'string' ? parseFloat(item.amount) : Number(item.amount),
+          type: item.type as 'income' | 'expense',
+          category: item.category,
+          date: item.date,
+          created_at: item.created_at,
+          description: item.title,
+        }));
+        setTransactions(parsed);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch transactions';
+      console.error('Transaction fetch exception:', msg);
+      setTransactionsError(msg);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  }, [user]);
+
+  // Load transactions whenever authenticated user changes
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  // Pure dynamic derived calculations
   const summary = useMemo(() => calculateFinancialSummary(transactions), [transactions]);
   const categorySpending = useMemo(() => calculateCategorySpending(transactions), [transactions]);
+  const monthlyData = useMemo(() => calculateMonthlyData(transactions), [transactions]);
   const splitSummary = useMemo(
     () => calculateSplitLedgerSummary(splitGroups, splitExpenses, settlements),
     [splitGroups, splitExpenses, settlements]
   );
 
-  const monthlyData = useMemo(() => {
-    // Dynamically update Sep point based on current transactions
-    const base = [...INITIAL_MONTHLY_DATA];
-    const sepIndex = base.findIndex((p) => p.month === 'Sep');
-    if (sepIndex >= 0) {
-      base[sepIndex] = {
-        month: 'Sep',
-        income: summary.totalIncome,
-        expenses: summary.totalExpenses,
-        savings: summary.savings,
-      };
+  // Add Transaction to Supabase
+  const addTransaction = async (txData: TransactionInput): Promise<{ success: boolean; error?: string }> => {
+    if (!user?.id) {
+      return { success: false, error: 'User is not authenticated' };
     }
-    return base;
-  }, [summary]);
 
-  const addTransaction = (tx: Omit<Transaction, 'id'>) => {
-    const newTx: Transaction = {
-      ...tx,
-      id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-    };
-    setTransactions((prev) => [newTx, ...prev]);
+    try {
+      const payload = {
+        user_id: user.id,
+        title: txData.title.trim(),
+        amount: txData.amount,
+        type: txData.type,
+        category: txData.category,
+        date: txData.date,
+      };
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding transaction to Supabase:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      if (data) {
+        const newTx: Transaction = {
+          id: data.id,
+          user_id: data.user_id,
+          title: data.title,
+          amount: typeof data.amount === 'string' ? parseFloat(data.amount) : Number(data.amount),
+          type: data.type as 'income' | 'expense',
+          category: data.category,
+          date: data.date,
+          created_at: data.created_at,
+          description: data.title,
+        };
+
+        // Immediately update local transaction list
+        setTransactions((prev) => [newTx, ...prev]);
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to add transaction';
+      console.error('Add transaction exception:', msg);
+      return { success: false, error: msg };
+    }
   };
 
-  const deleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+  // Update Transaction in Supabase
+  const updateTransaction = async (
+    id: string,
+    txData: TransactionInput
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .update({
+          title: txData.title.trim(),
+          amount: txData.amount,
+          type: txData.type,
+          category: txData.category,
+          date: txData.date,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating transaction in Supabase:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      if (data) {
+        const updatedTx: Transaction = {
+          id: data.id,
+          user_id: data.user_id,
+          title: data.title,
+          amount: typeof data.amount === 'string' ? parseFloat(data.amount) : Number(data.amount),
+          type: data.type as 'income' | 'expense',
+          category: data.category,
+          date: data.date,
+          created_at: data.created_at,
+          description: data.title,
+        };
+
+        // Immediately update local state
+        setTransactions((prev) => prev.map((t) => (t.id === id ? updatedTx : t)));
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update transaction';
+      console.error('Update transaction exception:', msg);
+      return { success: false, error: msg };
+    }
   };
 
+  // Delete Transaction from Supabase
+  const deleteTransaction = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting transaction from Supabase:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      // Immediately filter out deleted item from local state
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete transaction';
+      console.error('Delete transaction exception:', msg);
+      return { success: false, error: msg };
+    }
+  };
+
+  // Split bill operations
   const createSplitGroup = (group: Omit<SplitGroup, 'id' | 'createdAt'>) => {
     const newGroup: SplitGroup = {
       ...group,
-      id: `grp-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-      members: Array.from(new Set(['You', ...group.members])),
+      id: `grp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      createdAt: new Date().toISOString(),
     };
-    setSplitGroups((prev) => [...prev, newGroup]);
+    setSplitGroups((prev) => [newGroup, ...prev]);
     setSelectedGroupId(newGroup.id);
   };
 
   const addSplitExpense = (expense: Omit<SplitExpense, 'id'>) => {
     const newExpense: SplitExpense = {
       ...expense,
-      id: `sexp-${Date.now()}`,
+      id: `sexp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     };
     setSplitExpenses((prev) => [newExpense, ...prev]);
   };
@@ -171,29 +332,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const recordSettlement = (settlement: Omit<Settlement, 'id'>) => {
     const newSettlement: Settlement = {
       ...settlement,
-      id: `set-${Date.now()}`,
+      id: `settle-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     };
     setSettlements((prev) => [newSettlement, ...prev]);
   };
 
   const resetToDefaultData = () => {
-    setTransactions(INITIAL_TRANSACTIONS);
     setSplitGroups(INITIAL_GROUPS);
-    setSplitExpenses(INITIAL_SPLIT_EXPENSES);
-    setSettlements(INITIAL_SETTLEMENTS);
-    setSelectedGroupId(INITIAL_GROUPS[0]?.id || null);
-    try {
-      localStorage.removeItem(`${STORAGE_KEY}_transactions`);
-      localStorage.removeItem(`${STORAGE_KEY}_groups`);
-      localStorage.removeItem(`${STORAGE_KEY}_expenses`);
-      localStorage.removeItem(`${STORAGE_KEY}_settlements`);
-    } catch {}
+    setSplitExpenses([]);
+    setSettlements([]);
   };
 
   return (
     <FinanceContext.Provider
       value={{
         transactions,
+        loadingTransactions,
+        transactionsError,
         splitGroups,
         splitExpenses,
         settlements,
@@ -204,16 +359,20 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         monthlyData,
         splitSummary,
         isAddTransactionOpen,
+        editingTransaction,
         isCreateGroupOpen,
         isAddSplitExpenseOpen,
         isSettleUpOpen,
         setActiveTab,
         setSelectedGroupId,
         setAddTransactionOpen,
+        setEditingTransaction,
         setCreateGroupOpen,
         setAddSplitExpenseOpen,
         setSettleUpOpen,
+        fetchTransactions,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
         createSplitGroup,
         addSplitExpense,

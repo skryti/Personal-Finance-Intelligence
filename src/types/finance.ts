@@ -7,16 +7,19 @@ export type TransactionCategory =
   | 'Bills'
   | 'Entertainment'
   | 'Income'
-  | 'Other';
+  | 'Other'
+  | string;
 
 export interface Transaction {
   id: string;
-  description: string;
+  user_id: string;
+  title: string;
   amount: number;
-  type: TransactionType;
-  category: TransactionCategory;
-  date: string; // ISO YYYY-MM-DD
-  notes?: string;
+  type: 'income' | 'expense';
+  category: string;
+  date: string;
+  created_at: string;
+  description?: string;
 }
 
 export type SplitType = 'equal' | 'custom';
@@ -64,14 +67,14 @@ export interface FinancialSummary {
 }
 
 export interface CategorySpending {
-  category: TransactionCategory;
+  category: string;
   amount: number;
   percentage: number;
   color: string;
 }
 
 export interface MonthlyOverviewPoint {
-  month: string; // 'Jul', 'Aug', 'Sep'
+  month: string;
   income: number;
   expenses: number;
   savings: number;
