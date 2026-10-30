@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Plus,
@@ -9,6 +9,7 @@ import {
   X,
   UserPlus,
   Clock,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { SplitType, SplitAllocation } from '../../types/finance';
@@ -42,6 +43,7 @@ export const SplitBillsView: React.FC = () => {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
   const [newGroupMembersText, setNewGroupMembersText] = useState('');
+  const [includeMeInGroup, setIncludeMeInGroup] = useState(true);
 
   // 2. Add Group Expense Form
   const [expDescription, setExpDescription] = useState('');
@@ -60,15 +62,23 @@ export const SplitBillsView: React.FC = () => {
   useEffect(() => {
     if (activeGroup && activeGroup.members.length > 0) {
       setExpPaidBy(activeGroup.members[0] || 'You');
-      const otherMember = activeGroup.members.find((m) => m !== 'You') || activeGroup.members[0];
-      setSettleFrom(otherMember || '');
-      setSettleTo('You');
+      const hasYou = activeGroup.members.includes('You');
+      const defaultTo = hasYou ? 'You' : activeGroup.members[0];
+      const defaultFrom =
+        activeGroup.members.find((m) => m !== defaultTo) || activeGroup.members[0];
+      setSettleFrom(defaultFrom || '');
+      setSettleTo(defaultTo || '');
     }
   }, [activeGroup]);
 
   const activeGroupBalances =
     activeGroup && splitSummary.groupBalances[activeGroup.id]
       ? splitSummary.groupBalances[activeGroup.id]
+      : [];
+
+  const activeGroupDebts =
+    activeGroup && splitSummary.groupDebts && splitSummary.groupDebts[activeGroup.id]
+      ? splitSummary.groupDebts[activeGroup.id]
       : [];
 
   const activeGroupExpenses = activeGroup
@@ -79,6 +89,28 @@ export const SplitBillsView: React.FC = () => {
     ? settlements.filter((s) => s.groupId === activeGroup.id)
     : [];
 
+  // Live member preview for group creation
+  const previewMembers = useMemo(() => {
+    const parsed = newGroupMembersText
+      .split(',')
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0);
+    if (includeMeInGroup) {
+      const withoutYou = parsed.filter((m) => m.toLowerCase() !== 'you');
+      return ['You', ...withoutYou];
+    }
+    return parsed;
+  }, [newGroupMembersText, includeMeInGroup]);
+
+  // Quick settle shortcut
+  const handleQuickSettle = (from: string, to: string, amount: number) => {
+    setSettleFrom(from);
+    setSettleTo(to);
+    setSettleAmount(amount.toString());
+    setSettleNotes(`Settlement: ${from} to ${to}`);
+    setSettleUpOpen(true);
+  };
+
   // Group creation handler
   const handleCreateGroupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,17 +119,31 @@ export const SplitBillsView: React.FC = () => {
     const parsedMembers = newGroupMembersText
       .split(',')
       .map((m) => m.trim())
-      .filter((m) => m.length > 0 && m.toLowerCase() !== 'you');
+      .filter((m) => m.length > 0);
+
+    let finalMembers: string[] = [];
+    if (includeMeInGroup) {
+      const withoutYou = parsedMembers.filter((m) => m.toLowerCase() !== 'you');
+      finalMembers = ['You', ...withoutYou];
+    } else {
+      finalMembers = parsedMembers;
+    }
+
+    if (finalMembers.length < 2) {
+      alert('Please provide at least 2 participants for a split group.');
+      return;
+    }
 
     createSplitGroup({
       name: newGroupName.trim(),
       description: newGroupDesc.trim() || undefined,
-      members: ['You', ...parsedMembers],
+      members: finalMembers,
     });
 
     setNewGroupName('');
     setNewGroupDesc('');
     setNewGroupMembersText('');
+    setIncludeMeInGroup(true);
     setCreateGroupOpen(false);
   };
 
@@ -282,16 +328,47 @@ export const SplitBillsView: React.FC = () => {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Participant Names (Comma-separated)
+                    Participant Names (Comma-separated) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Aman, Sneha, Rohit ('You' is added automatically)"
+                    required={!includeMeInGroup || previewMembers.length < 2}
+                    placeholder="e.g. Aman, Sneha, Rohit or A, B, C"
                     value={newGroupMembersText}
                     onChange={(e) => setNewGroupMembersText(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
+
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={includeMeInGroup}
+                      onChange={(e) => setIncludeMeInGroup(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                    />
+                    <span>Include myself ('You') in this group</span>
+                  </label>
+                </div>
+
+                {previewMembers.length > 0 && (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl space-y-1">
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      Group Participants ({previewMembers.length}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {previewMembers.map((m) => (
+                        <span
+                          key={m}
+                          className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white border border-slate-200 text-slate-800"
+                        >
+                          {m} {m === 'You' && '(Me)'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 flex items-center justify-end gap-2">
                   <button
@@ -439,7 +516,70 @@ export const SplitBillsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Main Ledger Table & Member Balances */}
+      {/* 3. Who Owes Whom (Settlement Breakdown) Card */}
+      {activeGroup && (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <ArrowRightLeft className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-base">Who Owes Whom (Settlement Breakdown)</h3>
+              </div>
+              <p className="text-xs text-slate-400 font-medium mt-1">
+                Clear summary of who needs to give money to whom in {activeGroup.name}
+              </p>
+            </div>
+            {activeGroupDebts.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                {activeGroupDebts.length} pending settlement{activeGroupDebts.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {activeGroupDebts.length === 0 ? (
+            <div className="text-center py-6 px-4 bg-emerald-50/50 rounded-xl border border-emerald-100/60">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
+              <p className="font-bold text-slate-800 text-xs">Everyone is all settled up! 🎉</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">No pending debts or repayments in this group.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              {activeGroupDebts.map((debt, idx) => (
+                <div
+                  key={`${debt.from}-${debt.to}-${idx}`}
+                  className="p-4 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 flex items-center justify-between gap-3 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
+                      <span className="text-rose-600 font-extrabold">{debt.from}</span>
+                      <span className="text-slate-400 font-normal text-[11px]">owes</span>
+                      <span className="text-emerald-600 font-extrabold">{debt.to}</span>
+                    </div>
+                    <div className="text-lg font-black text-slate-900">
+                      {formatCurrency(debt.amount)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {debt.from} gives {formatCurrency(debt.amount)} to {debt.to}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleQuickSettle(debt.from, debt.to, debt.amount)}
+                    className="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    Settle
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4. Main Ledger Table & Member Balances */}
       {activeGroup && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Member Net Balances Table */}
@@ -487,22 +627,47 @@ export const SplitBillsView: React.FC = () => {
 
                     return (
                       <tr key={mb.member} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3.5 font-bold text-slate-900 flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
-                            {mb.member[0]}
+                        <td className="py-3.5 font-bold text-slate-900">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0 mt-0.5">
+                              {mb.member[0]}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span>{mb.member}</span>
+                                {mb.member === 'You' && (
+                                  <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-600 font-semibold rounded">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              {/* Dynamic who is giving to whom breakdown */}
+                              <div className="text-[11px] font-normal mt-0.5 space-y-0.5">
+                                {mb.owedBy && mb.owedBy.length > 0 && (
+                                  <div className="text-emerald-600 font-medium">
+                                    Receives: {mb.owedBy.map((d) => `${formatCurrency(d.amount)} from ${d.from}`).join(', ')}
+                                  </div>
+                                )}
+                                {mb.owesTo && mb.owesTo.length > 0 && (
+                                  <div className="text-rose-600 font-medium">
+                                    Owes: {mb.owesTo.map((d) => `${formatCurrency(d.amount)} to ${d.to}`).join(', ')}
+                                  </div>
+                                )}
+                                {(!mb.owedBy || mb.owedBy.length === 0) && (!mb.owesTo || mb.owesTo.length === 0) && (
+                                  <div className="text-slate-400">All settled up</div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <span>
-                            {mb.member} {mb.member === 'You' && '(Me)'}
-                          </span>
                         </td>
-                        <td className="py-3.5 text-right font-medium text-slate-700">
+                        <td className="py-3.5 text-right font-medium text-slate-700 align-top">
                           {formatCurrency(mb.paid)}
                         </td>
-                        <td className="py-3.5 text-right font-medium text-slate-700">
+                        <td className="py-3.5 text-right font-medium text-slate-700 align-top">
                           {formatCurrency(mb.share)}
                         </td>
                         <td
-                          className={`py-3.5 text-right font-bold whitespace-nowrap ${
+                          className={`py-3.5 text-right font-bold whitespace-nowrap align-top ${
                             isOwed
                               ? 'text-emerald-600'
                               : isOwing
@@ -513,7 +678,7 @@ export const SplitBillsView: React.FC = () => {
                           {isOwed ? '+' : ''}
                           {formatCurrency(mb.netBalance)}
                         </td>
-                        <td className="py-3.5 text-right">
+                        <td className="py-3.5 text-right align-top">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                               isOwed
@@ -578,7 +743,7 @@ export const SplitBillsView: React.FC = () => {
                   {activeGroupExpenses.map((exp) => (
                     <div
                       key={exp.id}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5 text-xs"
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-xs"
                     >
                       <div className="flex items-center justify-between font-bold text-slate-900">
                         <span className="truncate max-w-[160px]">{exp.description}</span>
@@ -590,10 +755,35 @@ export const SplitBillsView: React.FC = () => {
                         </span>
                         <span>{formatDate(exp.date)}</span>
                       </div>
-                      <div className="pt-1 border-t border-slate-200/60 text-[11px] text-slate-500">
-                        {exp.splitType === 'equal'
-                          ? `Split equally among ${exp.allocations.length} participants`
-                          : 'Custom allocation split'}
+                      <div className="pt-1.5 border-t border-slate-200/60 space-y-1">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                          <span>Split Breakdown:</span>
+                          <span>
+                            {exp.splitType === 'equal'
+                              ? `Equal (${formatCurrency(exp.amount / exp.allocations.length)}/person)`
+                              : 'Custom split'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {exp.allocations.map((alloc) => {
+                            const isPayer = alloc.member === exp.paidBy;
+                            return (
+                              <span
+                                key={alloc.member}
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  isPayer
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold'
+                                    : 'bg-white border border-slate-200 text-slate-700'
+                                }`}
+                              >
+                                {alloc.member}:{' '}
+                                {isPayer
+                                  ? `Paid ${formatCurrency(exp.amount)}`
+                                  : `Owes ${formatCurrency(alloc.amount)}`}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -648,16 +838,47 @@ export const SplitBillsView: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Participant Names (Comma-separated)
+                  Participant Names (Comma-separated) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Aman, Sneha, Rohit ('You' is added automatically)"
+                  required={!includeMeInGroup || previewMembers.length < 2}
+                  placeholder="e.g. Aman, Sneha, Rohit or A, B, C"
                   value={newGroupMembersText}
                   onChange={(e) => setNewGroupMembersText(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
                 />
               </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeMeInGroup}
+                    onChange={(e) => setIncludeMeInGroup(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                  />
+                  <span>Include myself ('You') in this group</span>
+                </label>
+              </div>
+
+              {previewMembers.length > 0 && (
+                <div className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl space-y-1">
+                  <div className="text-[11px] font-semibold text-slate-500">
+                    Group Participants ({previewMembers.length}):
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {previewMembers.map((m) => (
+                      <span
+                        key={m}
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white border border-slate-200 text-slate-800"
+                      >
+                        {m} {m === 'You' && '(Me)'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
@@ -828,9 +1049,35 @@ export const SplitBillsView: React.FC = () => {
             </button>
 
             <h3 className="text-lg font-bold text-slate-900 mb-1">Record Settlement</h3>
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-slate-400 mb-4">
               Clear outstanding debt in <strong>{activeGroup.name}</strong>
             </p>
+
+            {/* Quick select pending debt */}
+            {activeGroupDebts.length > 0 && (
+              <div className="mb-4 p-3 bg-indigo-50/60 border border-indigo-100/80 rounded-xl space-y-1.5">
+                <span className="text-[11px] font-bold text-indigo-900 block">
+                  Quick select pending debt:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeGroupDebts.map((d, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        setSettleFrom(d.from);
+                        setSettleTo(d.to);
+                        setSettleAmount(d.amount.toString());
+                        setSettleNotes(`Settlement from ${d.from} to ${d.to}`);
+                      }}
+                      className="px-2.5 py-1 bg-white hover:bg-indigo-600 hover:text-white border border-indigo-200 rounded-lg text-[11px] font-semibold text-indigo-700 shadow-2xs transition-all cursor-pointer"
+                    >
+                      {d.from} → {d.to}: {formatCurrency(d.amount)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSettlementSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">

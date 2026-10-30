@@ -1,4 +1,57 @@
-import { SplitExpense, Settlement, MemberBalance, SplitGroup, SplitLedgerSummary, SplitAllocation } from '../types/finance';
+import {
+  SplitExpense,
+  Settlement,
+  MemberBalance,
+  SplitGroup,
+  SplitLedgerSummary,
+  SplitAllocation,
+  GroupDebt,
+} from '../types/finance';
+
+export function calculateSimplifiedDebts(
+  balances: { member: string; netBalance: number }[]
+): GroupDebt[] {
+  // Extract debtors (netBalance < 0) and creditors (netBalance > 0)
+  const debtors = balances
+    .filter((b) => b.netBalance < -0.009)
+    .map((b) => ({ member: b.member, amount: Math.abs(b.netBalance) }))
+    .sort((a, b) => b.amount - a.amount);
+
+  const creditors = balances
+    .filter((b) => b.netBalance > 0.009)
+    .map((b) => ({ member: b.member, amount: b.netBalance }))
+    .sort((a, b) => b.amount - a.amount);
+
+  const debts: GroupDebt[] = [];
+  let d = 0;
+  let c = 0;
+
+  while (d < debtors.length && c < creditors.length) {
+    const debtor = debtors[d];
+    const creditor = creditors[c];
+    const payment = Math.min(debtor.amount, creditor.amount);
+
+    if (payment > 0.009) {
+      debts.push({
+        from: debtor.member,
+        to: creditor.member,
+        amount: Math.round(payment * 100) / 100,
+      });
+    }
+
+    debtor.amount = Math.round((debtor.amount - payment) * 100) / 100;
+    creditor.amount = Math.round((creditor.amount - payment) * 100) / 100;
+
+    if (debtor.amount <= 0.009) {
+      d++;
+    }
+    if (creditor.amount <= 0.009) {
+      c++;
+    }
+  }
+
+  return debts;
+}
 
 export function calculateGroupBalances(
   members: string[],
@@ -25,7 +78,7 @@ export function calculateGroupBalances(
     paidMap[set.toMember] = (paidMap[set.toMember] || 0) - set.amount;
   }
 
-  return members.map((member) => {
+  const rawBalances = members.map((member) => {
     const paid = paidMap[member] || 0;
     const share = shareMap[member] || 0;
     const netBalance = Math.round((paid - share) * 100) / 100;
@@ -36,6 +89,14 @@ export function calculateGroupBalances(
       netBalance,
     };
   });
+
+  const groupDebts = calculateSimplifiedDebts(rawBalances);
+
+  return rawBalances.map((rb) => ({
+    ...rb,
+    owesTo: groupDebts.filter((d) => d.from === rb.member),
+    owedBy: groupDebts.filter((d) => d.to === rb.member),
+  }));
 }
 
 export function calculateSplitLedgerSummary(
@@ -46,12 +107,16 @@ export function calculateSplitLedgerSummary(
   let totalYouOwe = 0;
   let totalOthersOweYou = 0;
   const groupBalances: Record<string, MemberBalance[]> = {};
+  const groupDebts: Record<string, GroupDebt[]> = {};
 
   for (const group of groups) {
     const groupExpenses = expenses.filter((e) => e.groupId === group.id);
     const groupSettlements = settlements.filter((s) => s.groupId === group.id);
     const balances = calculateGroupBalances(group.members, groupExpenses, groupSettlements);
     groupBalances[group.id] = balances;
+
+    const debts = calculateSimplifiedDebts(balances);
+    groupDebts[group.id] = debts;
 
     const youBalance = balances.find((b) => b.member === 'You');
     if (youBalance) {
@@ -68,6 +133,7 @@ export function calculateSplitLedgerSummary(
     totalOthersOweYou: Math.round(totalOthersOweYou * 100) / 100,
     netBalance: Math.round((totalOthersOweYou - totalYouOwe) * 100) / 100,
     groupBalances,
+    groupDebts,
   };
 }
 

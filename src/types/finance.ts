@@ -80,11 +80,19 @@ export interface MonthlyOverviewPoint {
   savings: number;
 }
 
+export interface GroupDebt {
+  from: string;
+  to: string;
+  amount: number;
+}
+
 export interface MemberBalance {
   member: string;
   paid: number;
   share: number;
   netBalance: number; // paid - share (+ = is owed, - = owes)
+  owesTo?: GroupDebt[];
+  owedBy?: GroupDebt[];
 }
 
 export interface SplitLedgerSummary {
@@ -92,6 +100,7 @@ export interface SplitLedgerSummary {
   totalOthersOweYou: number;
   netBalance: number;
   groupBalances: Record<string, MemberBalance[]>;
+  groupDebts?: Record<string, GroupDebt[]>;
 }
 
 export type TabType = 'dashboard' | 'transactions' | 'analytics' | 'split-bills' | 'settings';
