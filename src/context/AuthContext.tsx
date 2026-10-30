@@ -2,11 +2,26 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+/**
+ * Dynamic Redirect URL Resolution:
+ * Calculates redirect target based on environment (Vercel production or local dev)
+ */
+export const getURL = () => {
+  let url =
+    import.meta.env.VITE_SITE_URL || // Optional manual override
+    (typeof window !== 'undefined' && window.location.origin) ||
+    'http://localhost:5173';
+  // Clean trailing slash
+  return url.replace(/\/+$/, '');
+};
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isLoading: boolean;
   loginError: string | null;
+  clearLoginError: () => void;
   handleGoogleLogin: () => Promise<void>;
   handleLogout: () => Promise<void>;
 }
@@ -18,8 +33,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  const clearLoginError = () => setLoginError(null);
+
   useEffect(() => {
-    // 1. Fetch initial session if already signed in
+    // 1. Catch OAuth errors from the URL on mount
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const errorParam = urlParams.get('error') || urlParams.get('error_code');
+      const errorDescription = urlParams.get('error_description');
+
+      if (errorParam) {
+        const friendlyMessage =
+          errorParam === 'access_denied'
+            ? 'Login was canceled or unauthorized.'
+            : errorDescription
+            ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
+            : 'Login was canceled or unauthorized.';
+        setLoginError(friendlyMessage);
+
+        // Clean error params from the browser URL cleanly without full reload
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
+    // 2. Fetch initial session if already signed in
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error('Session retrieval error:', error.message);
@@ -28,12 +65,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // 2. Listen for auth changes (such as redirect back from Google OAuth or sign out)
+    // 3. Listen for auth changes (such as redirect back from Google OAuth or sign out)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setLoading(false);
+
+      // Clean URL Hash & Query Parameters After OAuth Callback
+      if (event === 'SIGNED_IN') {
+        if (
+          typeof window !== 'undefined' &&
+          (window.location.hash || window.location.search.includes('code='))
+        ) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
     });
 
     return () => {
@@ -44,10 +91,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleGoogleLogin = async () => {
     try {
       setLoginError(null);
+      const redirectUrl = getURL();
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin, // Returns back to http://localhost:5173
+          redirectTo: redirectUrl,
         },
       });
 
@@ -81,7 +130,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         user: session?.user ?? null,
         loading,
+        isLoading: loading,
         loginError,
+        clearLoginError,
         handleGoogleLogin,
         handleLogout,
       }}

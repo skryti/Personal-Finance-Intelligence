@@ -1,9 +1,9 @@
 import React from 'react';
-import { TrendingUp, Sparkles, AlertCircle, ShieldCheck } from 'lucide-react';
+import { TrendingUp, Sparkles, AlertCircle, ShieldCheck, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const LoginView: React.FC = () => {
-  const { handleGoogleLogin, loginError } = useAuth();
+  const { handleGoogleLogin, loginError, clearLoginError } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-12">
@@ -17,7 +17,7 @@ export const LoginView: React.FC = () => {
             Personal Finance Intelligence
           </h1>
           <p className="mt-2 text-sm text-slate-500 font-medium">
-            Smart expense tracking, AI categorization & split bills
+            Smart expense tracking, AI categorization &amp; split bills
           </p>
         </div>
 
@@ -37,17 +37,23 @@ export const LoginView: React.FC = () => {
             </p>
           </div>
 
-          {/* Error Message if OAuth fails */}
+          {/* Error Message if OAuth fails or is canceled */}
           {loginError && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 text-xs">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold">Sign-in Notice:</p>
-                <p className="text-rose-700">{loginError}</p>
-                <p className="text-rose-600 text-[11px] pt-1">
-                  Tip: Ensure the Google OAuth provider is enabled in your Supabase dashboard (Authentication &rarr; Providers &rarr; Google) with valid Client ID and Secret.
-                </p>
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start justify-between gap-3 text-rose-800 text-xs relative animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-rose-900">Sign-in Notice</p>
+                  <p className="text-rose-700">{loginError}</p>
+                </div>
               </div>
+              <button
+                onClick={clearLoginError}
+                className="text-rose-400 hover:text-rose-700 p-0.5 rounded-lg transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 
