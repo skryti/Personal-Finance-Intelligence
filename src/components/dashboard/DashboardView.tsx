@@ -82,8 +82,8 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* 1. Top 4 Financial Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* 1. Top 5 Financial Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         {/* Total Balance */}
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
@@ -157,7 +157,66 @@ export const DashboardView: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* You Will Receive (Split Bills Receivable) */}
+        <div
+          onClick={() => setActiveTab('split-bills')}
+          className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-emerald-200 cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 group-hover:text-emerald-600 transition-colors">
+              To Receive (Split)
+            </span>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-emerald-600 tracking-tight">
+              {formatCurrency(splitSummary.totalOthersOweYou)}
+            </h3>
+            <p className="mt-1 text-xs text-slate-400 font-medium">
+              {splitSummary.totalOthersOweYou > 0
+                ? 'Others owe you this money'
+                : 'No pending group repayments'}
+            </p>
+          </div>
+        </div>
       </div>
+
+      {/* Prominent Split Bills Receivable Alert Banner */}
+      {splitSummary.totalOthersOweYou > 0 && (
+        <div className="bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  Split Bills Receivable
+                </span>
+                <span className="text-xs text-slate-400">Incoming Funds</span>
+              </div>
+              <h4 className="font-extrabold text-slate-900 text-base mt-1">
+                You will receive overall{' '}
+                <span className="text-emerald-600 font-black">{formatCurrency(splitSummary.totalOthersOweYou)}</span>{' '}
+                from split bills
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Others owe you this money from shared group expenses. Click to view or settle debts.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('split-bills')}
+            className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <span>View Split Bills</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 2. Middle Row: Spending Donut, Monthly Overview Bar Chart, Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -547,22 +606,26 @@ export const DashboardView: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-100/60 my-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
-                Net Status
-              </span>
-              <h3 className="text-xl font-extrabold text-emerald-700 mt-0.5">
+            <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-100/60 my-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                  Overall Incoming
+                </span>
+                <span className="text-base font-black text-emerald-700">
+                  +{formatCurrency(splitSummary.totalOthersOweYou)}
+                </span>
+              </div>
+              {splitSummary.totalYouOwe > 0 && (
+                <div className="flex items-center justify-between text-xs font-bold text-rose-600">
+                  <span>You Owe Others:</span>
+                  <span>-{formatCurrency(splitSummary.totalYouOwe)}</span>
+                </div>
+              )}
+              <div className="pt-1.5 border-t border-emerald-200/60 text-[11px] text-emerald-800 font-medium">
                 {splitSummary.totalOthersOweYou > 0
-                  ? `You are owed ${formatCurrency(splitSummary.totalOthersOweYou)}`
-                  : splitSummary.totalYouOwe > 0
-                  ? `You owe ${formatCurrency(splitSummary.totalYouOwe)}`
-                  : 'All group expenses are settled'}
-              </h3>
-              <p className="text-xs text-emerald-600/90 mt-1 font-medium">
-                {splitSummary.totalOthersOweYou > 0
-                  ? 'Pending collections from active groups'
-                  : 'No active pending balances'}
-              </p>
+                  ? `You will receive overall ${formatCurrency(splitSummary.totalOthersOweYou)} from shared group expenses.`
+                  : 'All group expenses are settled up.'}
+              </div>
             </div>
 
             <button
