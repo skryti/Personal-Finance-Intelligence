@@ -2,3 +2,4 @@ node_modules
 didt
 .env
 dist
+.env*.local
