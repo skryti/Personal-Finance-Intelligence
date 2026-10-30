@@ -34,7 +34,7 @@ export interface SplitExpense {
   groupId: string;
   description: string;
   amount: number;
-  paidBy: string; // Member name, e.g., 'You' or 'Rahul'
+  paidBy: string; // Member name, e.g., 'You' or 'Aman'
   splitType: SplitType;
   allocations: SplitAllocation[];
   date: string; // ISO YYYY-MM-DD
@@ -54,7 +54,7 @@ export interface SplitGroup {
   id: string;
   name: string;
   description?: string;
-  members: string[]; // e.g. ['You', 'Rahul', 'Priya']
+  members: string[]; // e.g. ['You', 'Aman', 'Sneha']
   createdAt: string;
 }
 

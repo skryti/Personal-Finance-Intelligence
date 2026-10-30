@@ -314,7 +314,7 @@ export const AnalyticsView: React.FC = () => {
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>Data Source</span>
-            <span className="font-bold text-indigo-600">Live Supabase Database</span>
+            <span className="font-bold text-indigo-600">Encrypted Cloud Storage</span>
           </div>
         </div>
 

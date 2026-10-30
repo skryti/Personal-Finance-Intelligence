@@ -14,7 +14,7 @@ export const LoginView: React.FC = () => {
             <TrendingUp className="w-8 h-8" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Personal Finance Intelligence
+            Personal Expense Tracker
           </h1>
           <p className="mt-2 text-sm text-slate-500 font-medium">
             Smart expense tracking, AI categorization &amp; split bills
@@ -26,14 +26,14 @@ export const LoginView: React.FC = () => {
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Supabase Authentication</span>
+              <span>Secure Authentication</span>
             </div>
             
             <h2 className="text-lg font-bold text-slate-900 tracking-tight pt-1">
               Click Sign in with Google.
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-              It will redirect to Google&apos;s consent screen, allow you to choose your account, and redirect you back to your local app.
+              It will redirect to Google&apos;s consent screen, allow you to choose your account, and redirect you back to your personal tracker.
             </p>
           </div>
 
@@ -87,13 +87,13 @@ export const LoginView: React.FC = () => {
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            <span>Secured via Supabase Row Level Security &amp; OAuth 2.0</span>
+            <span>Secured with Encrypted Cloud Sync &amp; OAuth 2.0</span>
           </div>
         </div>
 
         {/* Footer info */}
         <p className="text-center text-xs text-slate-400">
-          Personal Finance Intelligence &copy; {new Date().getFullYear()} &bull; Built with React &amp; Supabase
+          Personal Expense Tracker &copy; {new Date().getFullYear()} &bull; Built with React &amp; Tailwind CSS
         </p>
       </div>
     </div>

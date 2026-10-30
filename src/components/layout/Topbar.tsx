@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Plus, Bell, LogOut, LogIn } from 'lucide-react';
+import { Calendar, Plus, LogOut, LogIn } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -37,16 +37,23 @@ export const Topbar: React.FC = () => {
       {/* Dynamic Greeting */}
       <div className="flex items-center gap-4">
         <div>
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">
-            {getGreeting()}, {displayName} 👋
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">
+              {getGreeting()}, {displayName} 👋
+            </h2>
+            {session && (
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                Online
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 font-medium">
-            {session ? 'Signed in with Google' : "Here's what is happening with your expenses today."}
+            Here&apos;s your financial overview today.
           </p>
         </div>
       </div>
 
-      {/* Date badge, Quick Add, Notifications, and Avatar */}
+      {/* Date badge, Quick Add, and Avatar */}
       <div className="flex items-center gap-3">
         {/* Date badge */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold">
@@ -54,22 +61,13 @@ export const Topbar: React.FC = () => {
           <span>{getFormattedDate()}</span>
         </div>
 
-        {/* Quick Add Action */}
+        {/* Quick Add Action - Works from any page */}
         <button
           onClick={() => setAddTransactionOpen(true)}
           className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all shadow-indigo-200 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
           <span>Add Transaction</span>
-        </button>
-
-        {/* Notification Bell */}
-        <button
-          className="w-8 h-8 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 flex items-center justify-center transition-colors relative cursor-pointer"
-          title="Notifications"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-600 rounded-full ring-2 ring-white" />
         </button>
 
         {/* Auth / Avatar Section */}
@@ -95,7 +93,7 @@ export const Topbar: React.FC = () => {
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-rose-200"
-                title="Sign out of Google"
+                title="Sign out"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Sign Out</span>

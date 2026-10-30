@@ -33,7 +33,7 @@ export const SettingsView: React.FC = () => {
           <div>
             <h4 className="font-bold text-slate-900 text-sm">Account &amp; Google Authentication</h4>
             <p className="text-xs text-slate-400">
-              Secured via Supabase OAuth 2.0 and Row Level Security
+              Secured via Google OAuth 2.0 &amp; Encrypted Cloud Sync
             </p>
           </div>
         </div>
@@ -84,7 +84,7 @@ export const SettingsView: React.FC = () => {
           <div>
             <h4 className="font-bold text-slate-900 text-sm">Database &amp; Storage Records</h4>
             <p className="text-xs text-slate-400">
-              Active records: {transactions.length} personal transactions (Supabase), {splitGroups.length} split groups, {splitExpenses.length} group expenses
+              Active records: {transactions.length} personal transactions, {splitGroups.length} split groups, {splitExpenses.length} group expenses
             </p>
           </div>
         </div>

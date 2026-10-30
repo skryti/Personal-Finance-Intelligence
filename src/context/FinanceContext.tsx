@@ -73,7 +73,7 @@ interface FinanceContextType {
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'pfi_store_v2';
+const STORAGE_KEY = 'pet_store_v1';
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -110,7 +110,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(INITIAL_GROUPS[0]?.id || null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (splitGroups.length > 0 && (!selectedGroupId || !splitGroups.some((g) => g.id === selectedGroupId))) {
+      setSelectedGroupId(splitGroups[0].id);
+    } else if (splitGroups.length === 0) {
+      setSelectedGroupId(null);
+    }
+  }, [splitGroups, selectedGroupId]);
 
   const [isAddTransactionOpen, setAddTransactionOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);

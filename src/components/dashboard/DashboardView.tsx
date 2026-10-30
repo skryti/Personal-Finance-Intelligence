@@ -427,7 +427,7 @@ export const DashboardView: React.FC = () => {
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-center">
-            <span className="text-[11px] text-slate-400">Live Supabase synchronization</span>
+            <span className="text-[11px] text-slate-400">Live cloud synchronization</span>
           </div>
         </div>
       </div>
@@ -598,7 +598,7 @@ export const DashboardView: React.FC = () => {
                   <li className="flex items-start gap-2">
                     <span className="text-amber-500 font-bold shrink-0">&bull;</span>
                     <span>
-                      All transactions are securely stored with Supabase Row Level Security.
+                      All transactions are securely stored with encrypted cloud backup.
                     </span>
                   </li>
                 </>
@@ -622,7 +622,7 @@ export const DashboardView: React.FC = () => {
                   <li className="flex items-start gap-2">
                     <span className="text-indigo-500 font-bold shrink-0">⚡</span>
                     <span>
-                      <strong className="text-slate-900">{transactions.length}</strong> transactions logged in Supabase.
+                      <strong className="text-slate-900">{transactions.length}</strong> personal transactions recorded.
                     </span>
                   </li>
                 </>

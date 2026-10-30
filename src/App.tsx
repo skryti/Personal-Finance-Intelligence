@@ -10,6 +10,7 @@ import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { SplitBillsView } from './components/split/SplitBillsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { LoginView } from './components/auth/LoginView';
+import { AddTransactionModal } from './components/transactions/AddTransactionModal';
 
 const MainContent: React.FC = () => {
   const { activeTab } = useFinance();
@@ -46,6 +47,9 @@ const MainContent: React.FC = () => {
 
         <Footer />
       </div>
+
+      {/* Global Add/Edit Transaction Modal - accessible from Topbar and any page */}
+      <AddTransactionModal />
     </div>
   );
 };

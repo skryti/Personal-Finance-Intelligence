@@ -7,14 +7,13 @@ import {
   Settings,
   Sparkles,
   ArrowUpRight,
-  RotateCcw,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { TabType } from '../../types/finance';
 import { formatCurrency } from '../../utils/formatters';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, summary, resetToDefaultData } = useFinance();
+  const { activeTab, setActiveTab, summary } = useFinance();
 
   const navItems: { id: TabType; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,9 +34,9 @@ export const Sidebar: React.FC = () => {
             </div>
             <div>
               <h1 className="font-bold text-slate-900 text-sm leading-tight tracking-tight">
-                Finance Intel
+                Personal Expense Tracker
               </h1>
-              <p className="text-[11px] text-slate-400 font-medium">Personal Ledger</p>
+              <p className="text-[11px] text-slate-400 font-medium">Smart Budgeting</p>
             </div>
           </div>
         </div>
@@ -54,7 +53,7 @@ export const Sidebar: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 cursor-pointer ${
                   isActive
                     ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -75,8 +74,8 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Mini Balance Card & Reset */}
-      <div className="p-4 border-t border-slate-100 space-y-3">
+      {/* Bottom Mini Balance Card */}
+      <div className="p-4 border-t border-slate-100">
         <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-sm">
           <div className="flex items-center justify-between text-xs text-slate-300 font-medium mb-1">
             <span>Net Balance</span>
@@ -93,15 +92,6 @@ export const Sidebar: React.FC = () => {
             <span className="text-white font-semibold">{summary.savingsRate}%</span>
           </div>
         </div>
-
-        <button
-          onClick={resetToDefaultData}
-          title="Reset to default mock dataset"
-          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-        >
-          <RotateCcw className="w-3 h-3" />
-          <span>Reset Sample Data</span>
-        </button>
       </div>
     </aside>
   );

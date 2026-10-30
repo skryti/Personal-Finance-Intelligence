@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Plus,
@@ -51,10 +51,20 @@ export const SplitBillsView: React.FC = () => {
   const [customAllocations, setCustomAllocations] = useState<Record<string, string>>({});
 
   // 3. Settlement Form
-  const [settleFrom, setSettleFrom] = useState('Rahul');
+  const [settleFrom, setSettleFrom] = useState('');
   const [settleTo, setSettleTo] = useState('You');
-  const [settleAmount, setSettleAmount] = useState('200');
-  const [settleNotes, setSettleNotes] = useState('UPI transfer');
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settleNotes, setSettleNotes] = useState('');
+
+  // When active group changes, update defaults
+  useEffect(() => {
+    if (activeGroup && activeGroup.members.length > 0) {
+      setExpPaidBy(activeGroup.members[0] || 'You');
+      const otherMember = activeGroup.members.find((m) => m !== 'You') || activeGroup.members[0];
+      setSettleFrom(otherMember || '');
+      setSettleTo('You');
+    }
+  }, [activeGroup]);
 
   const activeGroupBalances =
     activeGroup && splitSummary.groupBalances[activeGroup.id]
@@ -82,7 +92,7 @@ export const SplitBillsView: React.FC = () => {
     createSplitGroup({
       name: newGroupName.trim(),
       description: newGroupDesc.trim() || undefined,
-      members: parsedMembers,
+      members: ['You', ...parsedMembers],
     });
 
     setNewGroupName('');
@@ -131,8 +141,8 @@ export const SplitBillsView: React.FC = () => {
 
     recordSettlement({
       groupId: activeGroup.id,
-      fromMember: settleFrom,
-      toMember: settleTo,
+      fromMember: settleFrom || activeGroup.members[0] || 'You',
+      toMember: settleTo || 'You',
       amount: parseFloat(settleAmount),
       date: new Date().toISOString().split('T')[0],
       notes: settleNotes.trim() || undefined,
@@ -142,6 +152,169 @@ export const SplitBillsView: React.FC = () => {
     setSettleNotes('');
     setSettleUpOpen(false);
   };
+
+  // If no groups exist yet, show clean empty state
+  if (splitGroups.length === 0) {
+    return (
+      <div className="space-y-8">
+        {/* Metric Overview Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Active Groups
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Users className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold text-slate-900">0</h3>
+              <p className="mt-1 text-xs text-slate-400 font-medium">Shared expense ledgers</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                You Owe
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <ArrowUpRight className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold text-rose-600">{formatCurrency(0)}</h3>
+              <p className="mt-1 text-xs text-slate-400 font-medium">Your pending liabilities</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Others Owe You
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <ArrowDownLeft className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold text-emerald-600">{formatCurrency(0)}</h3>
+              <p className="mt-1 text-xs text-slate-400 font-medium">Pending reimbursements</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Group Expenses
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Receipt className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold text-slate-900">0</h3>
+              <p className="mt-1 text-xs text-slate-400 font-medium">Total shared bills recorded</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Empty state illustration/card */}
+        <div className="bg-white rounded-3xl p-12 border border-slate-100 shadow-sm text-center max-w-lg mx-auto space-y-4">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl mx-auto flex items-center justify-center">
+            <Users className="w-8 h-8 text-emerald-600" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">No expense groups yet</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            No expense groups yet. Create your first group to start splitting bills with friends or flatmates!
+          </p>
+          <button
+            onClick={() => setCreateGroupOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Create Group</span>
+          </button>
+        </div>
+
+        {/* Create Group Modal */}
+        {isCreateGroupOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-150">
+              <button
+                onClick={() => setCreateGroupOpen(false)}
+                className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Create Split Group</h3>
+              <p className="text-xs text-slate-400 mb-5">
+                Set up a shared pool for trips, roommates, or shared expenses
+              </p>
+
+              <form onSubmit={handleCreateGroupSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Group Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Trip, Roommates, Weekend Outing"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Description (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Shared meals, groceries, and travel"
+                    value={newGroupDesc}
+                    onChange={(e) => setNewGroupDesc(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Participant Names (Comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Aman, Sneha, Rohit ('You' is added automatically)"
+                    value={newGroupMembersText}
+                    onChange={(e) => setNewGroupMembersText(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreateGroupOpen(false)}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs cursor-pointer"
+                  >
+                    Create Group
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -226,7 +399,7 @@ export const SplitBillsView: React.FC = () => {
               <button
                 key={group.id}
                 onClick={() => setSelectedGroupId(group.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   isSelected
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -242,7 +415,7 @@ export const SplitBillsView: React.FC = () => {
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => setAddSplitExpenseOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Add Group Expense</span>
@@ -250,7 +423,7 @@ export const SplitBillsView: React.FC = () => {
 
           <button
             onClick={() => setSettleUpOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Settle Up</span>
@@ -258,7 +431,7 @@ export const SplitBillsView: React.FC = () => {
 
           <button
             onClick={() => setCreateGroupOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
           >
             <UserPlus className="w-3.5 h-3.5 text-slate-500" />
             <span>New Group</span>
@@ -283,10 +456,10 @@ export const SplitBillsView: React.FC = () => {
                   <div
                     key={m}
                     title={m}
-                    className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-700 shadow-xs"
+                    className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold shadow-xs"
                     style={{
-                      backgroundColor: ['#EEF2FF', '#FEF3C7', '#DCFCE7', '#FCE7F3'][idx % 4],
-                      color: ['#4F46E5', '#D97706', '#16A34A', '#DB2777'][idx % 4],
+                      backgroundColor: ['#EEF2FF', '#FEF3C7', '#DCFCE7', '#FCE7F3', '#E0F2FE'][idx % 5],
+                      color: ['#4F46E5', '#D97706', '#16A34A', '#DB2777', '#0284C7'][idx % 5],
                     }}
                   >
                     {m[0].toUpperCase()}
@@ -379,7 +552,7 @@ export const SplitBillsView: React.FC = () => {
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               {activeGroupExpenses.length === 0 && activeGroupSettlements.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">
-                  No activity in this group yet.
+                  No activity in this group yet. Add an expense or record a settlement to start the ledger.
                 </div>
               ) : (
                 <>
@@ -405,18 +578,22 @@ export const SplitBillsView: React.FC = () => {
                   {activeGroupExpenses.map((exp) => (
                     <div
                       key={exp.id}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-2.5 text-xs"
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5 text-xs"
                     >
-                      <Receipt className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          <strong>{exp.paidBy}</strong> paid{' '}
-                          <strong className="text-slate-900">{formatCurrency(exp.amount)}</strong>{' '}
-                          for "{exp.description}"
-                        </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {formatDate(exp.date)} • {exp.splitType} split across {exp.allocations.length} members
-                        </p>
+                      <div className="flex items-center justify-between font-bold text-slate-900">
+                        <span className="truncate max-w-[160px]">{exp.description}</span>
+                        <span>{formatCurrency(exp.amount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                        <span>
+                          Paid by <strong className="text-slate-700">{exp.paidBy}</strong>
+                        </span>
+                        <span>{formatDate(exp.date)}</span>
+                      </div>
+                      <div className="pt-1 border-t border-slate-200/60 text-[11px] text-slate-500">
+                        {exp.splitType === 'equal'
+                          ? `Split equally among ${exp.allocations.length} participants`
+                          : 'Custom allocation split'}
                       </div>
                     </div>
                   ))}
@@ -433,14 +610,14 @@ export const SplitBillsView: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setCreateGroupOpen(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1"
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             <h3 className="text-lg font-bold text-slate-900 mb-1">Create Split Group</h3>
             <p className="text-xs text-slate-400 mb-5">
-              Add a shared expense ledger for flatmates, trips, or projects
+              Set up a shared pool for trips, roommates, or flatmates
             </p>
 
             <form onSubmit={handleCreateGroupSubmit} className="space-y-4 text-xs">
@@ -451,7 +628,7 @@ export const SplitBillsView: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Weekend Goa Trip"
+                  placeholder="e.g. Trip, Roommates, Weekend Getaway"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
@@ -459,7 +636,7 @@ export const SplitBillsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Description</label>
+                <label className="block font-semibold text-slate-700 mb-1">Description (Optional)</label>
                 <input
                   type="text"
                   placeholder="e.g. Stay, food, and fuel expenses"
@@ -471,11 +648,11 @@ export const SplitBillsView: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Members (Comma-separated names)
+                  Participant Names (Comma-separated)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Rahul, Priya, Aman ('You' is added automatically)"
+                  placeholder="e.g. Aman, Sneha, Rohit ('You' is added automatically)"
                   value={newGroupMembersText}
                   onChange={(e) => setNewGroupMembersText(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
@@ -486,13 +663,13 @@ export const SplitBillsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCreateGroupOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs cursor-pointer"
                 >
                   Create Group
                 </button>
@@ -502,13 +679,13 @@ export const SplitBillsView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal 2: Add Group Expense Modal (Equal vs Custom Split) */}
+      {/* Modal 2: Add Group Expense Modal */}
       {isAddSplitExpenseOpen && activeGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setAddSplitExpenseOpen(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1"
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -526,7 +703,7 @@ export const SplitBillsView: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Dinner & drinks, Airbnb reservation"
+                  placeholder="e.g. Dinner & drinks, Groceries"
                   value={expDescription}
                   onChange={(e) => setExpDescription(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
@@ -555,7 +732,7 @@ export const SplitBillsView: React.FC = () => {
                   <select
                     value={expPaidBy}
                     onChange={(e) => setExpPaidBy(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900 cursor-pointer"
                   >
                     {activeGroup.members.map((m) => (
                       <option key={m} value={m}>
@@ -573,18 +750,18 @@ export const SplitBillsView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSplitType('equal')}
-                    className={`flex-1 py-1.5 font-semibold rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 font-semibold rounded-lg transition-all cursor-pointer ${
                       splitType === 'equal'
                         ? 'bg-white text-indigo-600 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
-                    Equal Split (₹{expAmount ? (Number(expAmount) / activeGroup.members.length).toFixed(0) : 0}/person)
+                    Equal Split ({expAmount ? `₹${(Number(expAmount) / activeGroup.members.length).toFixed(0)}/person` : 'Equal'})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSplitType('custom')}
-                    className={`flex-1 py-1.5 font-semibold rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 font-semibold rounded-lg transition-all cursor-pointer ${
                       splitType === 'custom'
                         ? 'bg-white text-indigo-600 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
@@ -623,13 +800,13 @@ export const SplitBillsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAddSplitExpenseOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-xs"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-xs cursor-pointer"
                 >
                   Save Split Expense
                 </button>
@@ -645,7 +822,7 @@ export const SplitBillsView: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setSettleUpOpen(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1"
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -662,7 +839,7 @@ export const SplitBillsView: React.FC = () => {
                   <select
                     value={settleFrom}
                     onChange={(e) => setSettleFrom(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900 cursor-pointer"
                   >
                     {activeGroup.members.map((m) => (
                       <option key={m} value={m}>
@@ -677,7 +854,7 @@ export const SplitBillsView: React.FC = () => {
                   <select
                     value={settleTo}
                     onChange={(e) => setSettleTo(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900 cursor-pointer"
                   >
                     {activeGroup.members.map((m) => (
                       <option key={m} value={m}>
@@ -697,7 +874,7 @@ export const SplitBillsView: React.FC = () => {
                   step="any"
                   required
                   min="1"
-                  placeholder="e.g. 200"
+                  placeholder="e.g. 500"
                   value={settleAmount}
                   onChange={(e) => setSettleAmount(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
@@ -705,10 +882,10 @@ export const SplitBillsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Notes / Reference</label>
+                <label className="block font-semibold text-slate-700 mb-1">Notes / Reference (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. UPI Ref / Google Pay payment"
+                  placeholder="e.g. UPI Ref / Cash payment"
                   value={settleNotes}
                   onChange={(e) => setSettleNotes(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-900"
@@ -719,13 +896,13 @@ export const SplitBillsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSettleUpOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs cursor-pointer"
                 >
                   Record Settlement
                 </button>
