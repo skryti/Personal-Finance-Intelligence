@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Sparkles, AlertCircle, ShieldCheck, X } from 'lucide-react';
+import { TrendingUp, Sparkles, AlertCircle, X, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const LoginView: React.FC = () => {
@@ -84,16 +84,12 @@ export const LoginView: React.FC = () => {
               <span className="text-sm">Sign in with Google</span>
             </button>
           </div>
-
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            <span>Secured with Encrypted Cloud Sync &amp; OAuth 2.0</span>
-          </div>
         </div>
 
         {/* Footer info */}
-        <p className="text-center text-xs text-slate-400">
-          Personal Expense Tracker &copy; {new Date().getFullYear()} &bull; Built with React &amp; Tailwind CSS
+        <p className="text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-1">
+          <span>Developed by Sanskriti with</span>
+          <span className="text-rose-500 text-sm leading-none">❤️</span>
         </p>
       </div>
     </div>
