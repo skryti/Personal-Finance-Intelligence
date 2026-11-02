@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export const Topbar: React.FC = () => {
   const { setAddTransactionOpen } = useFinance();
-  const { user, session, handleGoogleLogin, handleLogout } = useAuth();
+  const { user, session, handleGoogleLogin, handleLogout, isDemoMode, exitDemoMode } = useAuth();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -41,11 +41,15 @@ export const Topbar: React.FC = () => {
             <h2 className="text-base font-bold text-slate-900 tracking-tight">
               {getGreeting()}, {displayName} 👋
             </h2>
-            {session && (
+            {session ? (
               <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                 Online
               </span>
-            )}
+            ) : isDemoMode ? (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                🚀 Demo Mode
+              </span>
+            ) : null}
           </div>
           <p className="text-xs text-slate-500 font-medium">
             Here&apos;s your financial overview today.
@@ -97,6 +101,20 @@ export const Topbar: React.FC = () => {
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Sign Out</span>
+              </button>
+            </div>
+          ) : isDemoMode ? (
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-indigo-200 shadow-xs" title="Demo User">
+                S
+              </div>
+              <button
+                onClick={exitDemoMode}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:text-rose-600 bg-amber-50 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-amber-200 hover:border-rose-200"
+                title="Exit Demo Mode"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Exit Demo</span>
               </button>
             </div>
           ) : (

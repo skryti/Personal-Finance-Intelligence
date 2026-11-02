@@ -16,6 +16,13 @@ import {
   INITIAL_SETTLEMENTS,
 } from '../data/initialMockData';
 import {
+  DEMO_TRANSACTIONS,
+  DEMO_SPLIT_GROUPS,
+  DEMO_SPLIT_EXPENSES,
+  DEMO_SETTLEMENTS,
+  DEMO_USER_ID,
+} from '../data/demoData';
+import {
   calculateFinancialSummary,
   calculateCategorySpending,
   calculateMonthlyData,
@@ -69,6 +76,8 @@ interface FinanceContextType {
   deleteSplitGroup: (groupId: string) => Promise<void>;
   renameMemberInGroup: (groupId: string, oldName: string, newName: string) => Promise<void>;
   addSplitExpense: (expense: Omit<SplitExpense, 'id'>) => void;
+  deleteSplitExpense: (expenseId: string) => Promise<void>;
+  deleteSettlement: (settlementId: string) => Promise<void>;
   recordSettlement: (settlement: Omit<Settlement, 'id'>) => void;
   resetToDefaultData: () => void;
 }
@@ -78,13 +87,21 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 const STORAGE_KEY = 'pet_store_v1';
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState<boolean>(true);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
 
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>(() => {
+    if (isDemoMode) {
+      try {
+        const stored = localStorage.getItem('pet_demo_groups');
+        return stored ? JSON.parse(stored) : DEMO_SPLIT_GROUPS;
+      } catch {
+        return DEMO_SPLIT_GROUPS;
+      }
+    }
     try {
       const stored = localStorage.getItem(`${STORAGE_KEY}_groups`);
       return stored ? JSON.parse(stored) : INITIAL_GROUPS;
@@ -94,6 +111,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [splitExpenses, setSplitExpenses] = useState<SplitExpense[]>(() => {
+    if (isDemoMode) {
+      try {
+        const stored = localStorage.getItem('pet_demo_expenses');
+        return stored ? JSON.parse(stored) : DEMO_SPLIT_EXPENSES;
+      } catch {
+        return DEMO_SPLIT_EXPENSES;
+      }
+    }
     try {
       const stored = localStorage.getItem(`${STORAGE_KEY}_expenses`);
       return stored ? JSON.parse(stored) : INITIAL_SPLIT_EXPENSES;
@@ -103,6 +128,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [settlements, setSettlements] = useState<Settlement[]>(() => {
+    if (isDemoMode) {
+      try {
+        const stored = localStorage.getItem('pet_demo_settlements');
+        return stored ? JSON.parse(stored) : DEMO_SETTLEMENTS;
+      } catch {
+        return DEMO_SETTLEMENTS;
+      }
+    }
     try {
       const stored = localStorage.getItem(`${STORAGE_KEY}_settlements`);
       return stored ? JSON.parse(stored) : INITIAL_SETTLEMENTS;
@@ -117,6 +150,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Sync helper: save to Supabase cloud auth metadata and user-isolated localStorage
   const syncSplitToBackend = useCallback(
     async (groups: SplitGroup[], expenses: SplitExpense[], settleList: Settlement[]) => {
+      if (isDemoMode) {
+        try {
+          localStorage.setItem('pet_demo_groups', JSON.stringify(groups));
+          localStorage.setItem('pet_demo_expenses', JSON.stringify(expenses));
+          localStorage.setItem('pet_demo_settlements', JSON.stringify(settleList));
+        } catch (e) {
+          console.error('Demo split storage error', e);
+        }
+        return;
+      }
+
       // Local cache
       try {
         localStorage.setItem(`${STORAGE_KEY}_groups`, JSON.stringify(groups));
@@ -146,11 +190,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
     },
-    [user]
+    [user, isDemoMode]
   );
 
-  // Load split data whenever authenticated user changes
+  // Load split data whenever authenticated user or demo mode changes
   useEffect(() => {
+    if (isDemoMode) {
+      try {
+        const storedG = localStorage.getItem('pet_demo_groups');
+        const storedE = localStorage.getItem('pet_demo_expenses');
+        const storedS = localStorage.getItem('pet_demo_settlements');
+        const gList = storedG ? JSON.parse(storedG) : DEMO_SPLIT_GROUPS;
+        const eList = storedE ? JSON.parse(storedE) : DEMO_SPLIT_EXPENSES;
+        const sList = storedS ? JSON.parse(storedS) : DEMO_SETTLEMENTS;
+        setSplitGroups(gList);
+        setSplitExpenses(eList);
+        setSettlements(sList);
+        if (gList.length > 0) {
+          setSelectedGroupId(gList[0].id);
+        }
+      } catch {
+        setSplitGroups(DEMO_SPLIT_GROUPS);
+        setSplitExpenses(DEMO_SPLIT_EXPENSES);
+        setSettlements(DEMO_SETTLEMENTS);
+        setSelectedGroupId(DEMO_SPLIT_GROUPS[0].id);
+      }
+      return;
+    }
+
     if (!user) {
       setSplitGroups([]);
       setSplitExpenses([]);
@@ -207,6 +274,43 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }));
           setSplitGroups(parsedGroups);
           setSelectedGroupId((prev) => prev || parsedGroups[0]?.id || null);
+        } else if (grpRes.data && grpRes.data.length === 0 && initialG.length > 0) {
+          // Relational tables were newly created -> backfill existing local split data
+          for (const g of initialG) {
+            await supabase.from('split_groups').insert({
+              id: g.id,
+              user_id: user.id,
+              name: g.name,
+              description: g.description,
+              members: g.members,
+              created_at: g.createdAt,
+            });
+          }
+          for (const exp of initialE) {
+            await supabase.from('split_expenses').insert({
+              id: exp.id,
+              user_id: user.id,
+              group_id: exp.groupId,
+              description: exp.description,
+              amount: exp.amount,
+              paid_by: exp.paidBy,
+              split_type: exp.splitType,
+              allocations: exp.allocations,
+              date: exp.date,
+            });
+          }
+          for (const s of initialS) {
+            await supabase.from('settlements').insert({
+              id: s.id,
+              user_id: user.id,
+              group_id: s.groupId,
+              from_member: s.fromMember,
+              to_member: s.toMember,
+              amount: s.amount,
+              date: s.date,
+              notes: s.notes,
+            });
+          }
         }
 
         if (expRes.data && expRes.data.length > 0) {
@@ -240,8 +344,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     };
 
-    fetchFromSupabaseTables();
-  }, [user]);
+    if (!isDemoMode) {
+      fetchFromSupabaseTables();
+    }
+  }, [user, isDemoMode]);
 
   useEffect(() => {
     if (splitGroups.length > 0 && (!selectedGroupId || !splitGroups.some((g) => g.id === selectedGroupId))) {
@@ -257,8 +363,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isAddSplitExpenseOpen, setAddSplitExpenseOpen] = useState(false);
   const [isSettleUpOpen, setSettleUpOpen] = useState(false);
 
-  // Fetch transactions from Supabase
+  // Fetch transactions from Supabase or Local Demo Store
   const fetchTransactions = useCallback(async () => {
+    if (isDemoMode) {
+      setLoadingTransactions(true);
+      setTransactionsError(null);
+      try {
+        const stored = localStorage.getItem('pet_demo_transactions');
+        if (stored) {
+          setTransactions(JSON.parse(stored));
+        } else {
+          setTransactions(DEMO_TRANSACTIONS);
+          localStorage.setItem('pet_demo_transactions', JSON.stringify(DEMO_TRANSACTIONS));
+        }
+      } catch {
+        setTransactions(DEMO_TRANSACTIONS);
+      } finally {
+        setLoadingTransactions(false);
+      }
+      return;
+    }
+
     if (!user) {
       setTransactions([]);
       setLoadingTransactions(false);
@@ -298,7 +423,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setLoadingTransactions(false);
     }
-  }, [user]);
+  }, [user, isDemoMode]);
 
   // Load transactions whenever authenticated user changes
   useEffect(() => {
@@ -314,8 +439,31 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [splitGroups, splitExpenses, settlements]
   );
 
-  // Add Transaction to Supabase
+  // Add Transaction to Supabase or Demo Store
   const addTransaction = async (txData: TransactionInput): Promise<{ success: boolean; error?: string }> => {
+    if (isDemoMode) {
+      const newTx: Transaction = {
+        id: `demo-tx-${Date.now()}`,
+        user_id: DEMO_USER_ID,
+        title: txData.title.trim(),
+        amount: txData.amount,
+        type: txData.type,
+        category: txData.category,
+        date: txData.date,
+        created_at: new Date().toISOString(),
+        description: txData.title.trim(),
+      };
+
+      setTransactions((prev) => {
+        const updated = [newTx, ...prev];
+        try {
+          localStorage.setItem('pet_demo_transactions', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+      return { success: true };
+    }
+
     if (!user?.id) {
       return { success: false, error: 'User is not authenticated' };
     }
@@ -366,11 +514,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Update Transaction in Supabase
+  // Update Transaction in Supabase or Demo Store
   const updateTransaction = async (
     id: string,
     txData: TransactionInput
   ): Promise<{ success: boolean; error?: string }> => {
+    if (isDemoMode) {
+      setTransactions((prev) => {
+        const updated = prev.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                title: txData.title.trim(),
+                amount: txData.amount,
+                type: txData.type,
+                category: txData.category,
+                date: txData.date,
+                description: txData.title.trim(),
+              }
+            : t
+        );
+        try {
+          localStorage.setItem('pet_demo_transactions', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+      return { success: true };
+    }
+
     try {
       const { data, error } = await supabase
         .from('transactions')
@@ -415,8 +586,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Delete Transaction from Supabase
+  // Delete Transaction from Supabase or Demo Store
   const deleteTransaction = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    if (isDemoMode) {
+      setTransactions((prev) => {
+        const updated = prev.filter((t) => t.id !== id);
+        try {
+          localStorage.setItem('pet_demo_transactions', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+      return { success: true };
+    }
+
     try {
       const { error } = await supabase
         .from('transactions')
@@ -450,6 +632,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSelectedGroupId(newGroup.id);
     syncSplitToBackend(updated, splitExpenses, settlements);
 
+    if (isDemoMode) return;
+
     if (user?.id) {
       supabase
         .from('split_groups')
@@ -479,6 +663,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     syncSplitToBackend(updatedGroups, updatedExpenses, updatedSettlements);
+
+    if (isDemoMode) return;
 
     if (user?.id) {
       supabase.from('split_groups').delete().eq('id', groupId).eq('user_id', user.id).then();
@@ -526,6 +712,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     syncSplitToBackend(updatedGroups, updatedExpenses, updatedSettlements);
 
+    if (isDemoMode) return;
+
     if (user?.id) {
       const targetGroup = updatedGroups.find((g) => g.id === groupId);
       if (targetGroup) {
@@ -548,6 +736,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSplitExpenses(updated);
     syncSplitToBackend(splitGroups, updated, settlements);
 
+    if (isDemoMode) return;
+
     if (user?.id) {
       supabase
         .from('split_expenses')
@@ -566,6 +756,46 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const deleteSplitExpense = async (expenseId: string) => {
+    const updatedExpenses = splitExpenses.filter((e) => e.id !== expenseId);
+    setSplitExpenses(updatedExpenses);
+    syncSplitToBackend(splitGroups, updatedExpenses, settlements);
+
+    if (isDemoMode) return;
+
+    if (user?.id) {
+      try {
+        await supabase
+          .from('split_expenses')
+          .delete()
+          .eq('id', expenseId)
+          .eq('user_id', user.id);
+      } catch (e) {
+        console.error('Error deleting split expense from Supabase:', e);
+      }
+    }
+  };
+
+  const deleteSettlement = async (settlementId: string) => {
+    const updatedSettlements = settlements.filter((s) => s.id !== settlementId);
+    setSettlements(updatedSettlements);
+    syncSplitToBackend(splitGroups, splitExpenses, updatedSettlements);
+
+    if (isDemoMode) return;
+
+    if (user?.id) {
+      try {
+        await supabase
+          .from('settlements')
+          .delete()
+          .eq('id', settlementId)
+          .eq('user_id', user.id);
+      } catch (e) {
+        console.error('Error deleting settlement from Supabase:', e);
+      }
+    }
+  };
+
   const recordSettlement = (settlement: Omit<Settlement, 'id'>) => {
     const newSettlement: Settlement = {
       ...settlement,
@@ -574,6 +804,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = [newSettlement, ...settlements];
     setSettlements(updated);
     syncSplitToBackend(splitGroups, splitExpenses, updated);
+
+    if (isDemoMode) return;
 
     if (user?.id) {
       supabase
@@ -593,6 +825,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const resetToDefaultData = () => {
+    if (isDemoMode) {
+      setTransactions(DEMO_TRANSACTIONS);
+      setSplitGroups(DEMO_SPLIT_GROUPS);
+      setSplitExpenses(DEMO_SPLIT_EXPENSES);
+      setSettlements(DEMO_SETTLEMENTS);
+      try {
+        localStorage.setItem('pet_demo_transactions', JSON.stringify(DEMO_TRANSACTIONS));
+        localStorage.setItem('pet_demo_groups', JSON.stringify(DEMO_SPLIT_GROUPS));
+        localStorage.setItem('pet_demo_expenses', JSON.stringify(DEMO_SPLIT_EXPENSES));
+        localStorage.setItem('pet_demo_settlements', JSON.stringify(DEMO_SETTLEMENTS));
+      } catch {}
+      return;
+    }
     setSplitGroups(INITIAL_GROUPS);
     setSplitExpenses([]);
     setSettlements([]);
@@ -633,6 +878,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteSplitGroup,
         renameMemberInGroup,
         addSplitExpense,
+        deleteSplitExpense,
+        deleteSettlement,
         recordSettlement,
         resetToDefaultData,
       }}

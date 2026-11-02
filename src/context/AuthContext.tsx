@@ -24,6 +24,9 @@ interface AuthContextType {
   clearLoginError: () => void;
   handleGoogleLogin: () => Promise<void>;
   handleLogout: () => Promise<void>;
+  isDemoMode: boolean;
+  enterDemoMode: () => void;
+  exitDemoMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,8 +35,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pet_demo_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const clearLoginError = () => setLoginError(null);
+
+  const enterDemoMode = () => {
+    try {
+      localStorage.setItem('pet_demo_mode', 'true');
+    } catch {}
+    setIsDemoMode(true);
+  };
+
+  const exitDemoMode = () => {
+    try {
+      localStorage.removeItem('pet_demo_mode');
+    } catch {}
+    setIsDemoMode(false);
+  };
 
   useEffect(() => {
     // 1. Catch OAuth errors from the URL on mount
@@ -113,9 +137,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Logout error:', error.message);
+      localStorage.removeItem('pet_demo_mode');
+      setIsDemoMode(false);
+      if (session) {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('Logout error:', error.message);
+        }
       }
       setSession(null);
     } catch (err: unknown) {
@@ -124,17 +152,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const demoUser: User = {
+    id: 'demo-user-sanskriti',
+    app_metadata: { provider: 'demo' },
+    user_metadata: {
+      full_name: 'Sanskriti (Demo Mode)',
+      name: 'Sanskriti',
+      avatar_url: '',
+    },
+    aud: 'authenticated',
+    created_at: '2026-09-01T00:00:00Z',
+    email: 'demo@preview.local',
+    phone: '',
+    role: 'authenticated',
+    updated_at: new Date().toISOString(),
+  };
+
+  const effectiveUser = session?.user ?? (isDemoMode ? demoUser : null);
+
   return (
     <AuthContext.Provider
       value={{
         session,
-        user: session?.user ?? null,
+        user: effectiveUser,
         loading,
         isLoading: loading,
         loginError,
         clearLoginError,
         handleGoogleLogin,
         handleLogout,
+        isDemoMode,
+        enterDemoMode,
+        exitDemoMode,
       }}
     >
       {children}

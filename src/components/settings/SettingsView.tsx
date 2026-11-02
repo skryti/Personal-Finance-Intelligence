@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export const SettingsView: React.FC = () => {
   const { resetToDefaultData, transactions, splitGroups, splitExpenses } = useFinance();
-  const { user, session, handleLogout } = useAuth();
+  const { user, session, handleLogout, isDemoMode, exitDemoMode } = useAuth();
 
   const displayName =
     user?.user_metadata?.full_name ||
@@ -31,9 +31,13 @@ export const SettingsView: React.FC = () => {
             <Shield className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-bold text-slate-900 text-sm">Account &amp; Google Authentication</h4>
+            <h4 className="font-bold text-slate-900 text-sm">
+              {isDemoMode ? 'Demo Sandbox Session' : 'Account & Google Authentication'}
+            </h4>
             <p className="text-xs text-slate-400">
-              Secured via Google OAuth 2.0 &amp; Encrypted Cloud Sync
+              {isDemoMode
+                ? 'Running in local sandbox mode without Google login • Database untouched'
+                : 'Secured via Google OAuth 2.0 & Encrypted Cloud Sync'}
             </p>
           </div>
         </div>
@@ -47,31 +51,49 @@ export const SettingsView: React.FC = () => {
                 className="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-500"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
-                {displayName[0]?.toUpperCase() || 'U'}
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                {displayName[0]?.toUpperCase() || 'S'}
               </div>
             )}
             <div>
               <div className="flex items-center gap-2">
                 <h5 className="text-sm font-bold text-slate-900">{displayName}</h5>
-                {session && (
+                {session ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
                     <UserCheck className="w-3 h-3" /> Signed In
                   </span>
-                )}
+                ) : isDemoMode ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                    🚀 Demo Exploration
+                  </span>
+                ) : null}
               </div>
-              <p className="text-xs text-slate-500">{user?.email || 'Authenticated via Google'}</p>
+              <p className="text-xs text-slate-500">
+                {isDemoMode
+                  ? 'September & October demo dataset loaded locally'
+                  : user?.email || 'Authenticated via Google'}
+              </p>
             </div>
           </div>
 
           <div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
-            </button>
+            {isDemoMode ? (
+              <button
+                onClick={exitDemoMode}
+                className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 hover:bg-rose-50 text-amber-800 hover:text-rose-600 border border-amber-200 hover:border-rose-200 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Exit Demo Mode</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -112,9 +134,13 @@ export const SettingsView: React.FC = () => {
 
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
             <div>
-              <h5 className="text-xs font-bold text-slate-900">Reset Split Bills Ledger</h5>
+              <h5 className="text-xs font-bold text-slate-900">
+                {isDemoMode ? 'Reset Demo Transactions & Split Ledger' : 'Reset Split Bills Ledger'}
+              </h5>
               <p className="text-[11px] text-slate-500">
-                Resets local split groups and settlement entries to default state
+                {isDemoMode
+                  ? 'Re-initializes all September & October salary, rent, bills, groceries and split groups back to original demo values'
+                  : 'Resets local split groups and settlement entries to default state'}
               </p>
             </div>
             <button
@@ -122,7 +148,7 @@ export const SettingsView: React.FC = () => {
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Split Ledger</span>
+              <span>{isDemoMode ? 'Reset Demo Data' : 'Reset Split Ledger'}</span>
             </button>
           </div>
         </div>

@@ -55,7 +55,7 @@ const MainContent: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { session, loading } = useAuth();
+  const { session, loading, isDemoMode } = useAuth();
 
   if (loading) {
     return (
@@ -66,8 +66,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // When not logged in, display the landing / sign-in screen
-  if (!session) {
+  // When not logged in and not in demo mode, display the landing / sign-in screen
+  if (!session && !isDemoMode) {
     return <LoginView />;
   }
 

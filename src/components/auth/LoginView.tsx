@@ -3,7 +3,7 @@ import { TrendingUp, Sparkles, AlertCircle, X, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const LoginView: React.FC = () => {
-  const { handleGoogleLogin, loginError, clearLoginError } = useAuth();
+  const { handleGoogleLogin, loginError, clearLoginError, enterDemoMode } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-12">
@@ -57,8 +57,8 @@ export const LoginView: React.FC = () => {
             </div>
           )}
 
-          {/* Sign in with Google Button */}
-          <div className="space-y-3">
+          {/* Sign in with Google Button & Demo Option */}
+          <div className="space-y-3.5">
             <button
               onClick={handleGoogleLogin}
               className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 font-semibold rounded-2xl border border-slate-300 shadow-xs hover:shadow transition-all group cursor-pointer"
@@ -83,6 +83,26 @@ export const LoginView: React.FC = () => {
               </svg>
               <span className="text-sm">Sign in with Google</span>
             </button>
+
+            {/* Divider */}
+            <div className="relative flex items-center justify-center py-1">
+              <div className="border-t border-slate-200 w-full" />
+              <span className="bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                or explore demo without login
+              </span>
+            </div>
+
+            {/* Explore Demo Mode Button */}
+            <button
+              onClick={enterDemoMode}
+              className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 hover:from-indigo-700 hover:to-purple-700 active:scale-[0.99] text-white font-semibold rounded-2xl shadow-md shadow-indigo-200 hover:shadow-lg transition-all cursor-pointer text-sm group"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
+              <span>Explore Demo Mode</span>
+            </button>
+            <p className="text-[11px] text-center text-slate-400 font-medium px-2 leading-relaxed">
+              Pre-loaded with September &amp; October transactions, ₹50k salary, rent, bills &amp; split groups.
+            </p>
           </div>
         </div>
 
