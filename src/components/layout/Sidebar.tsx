@@ -6,7 +6,6 @@ import {
   Users,
   Settings,
   Sparkles,
-  ArrowUpRight,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { TabType } from '../../types/finance';
@@ -77,12 +76,8 @@ export const Sidebar: React.FC = () => {
       {/* Bottom Mini Balance Card */}
       <div className="p-4 border-t border-slate-100">
         <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-sm">
-          <div className="flex items-center justify-between text-xs text-slate-300 font-medium mb-1">
+          <div className="text-xs text-slate-300 font-medium mb-1">
             <span>Net Balance</span>
-            <span className="flex items-center text-emerald-400 text-[11px]">
-              <ArrowUpRight className="w-3 h-3 mr-0.5" />
-              Live
-            </span>
           </div>
           <div className="text-lg font-bold tracking-tight">
             {formatCurrency(summary.totalBalance)}

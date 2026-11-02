@@ -84,21 +84,21 @@ export const DashboardView: React.FC = () => {
     <div className="space-y-8">
       {/* 1. Top 5 Financial Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-        {/* Total Balance */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        {/* Total Balance (Highlighted Hero Metric) */}
+        <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800 text-white rounded-2xl p-6 shadow-lg shadow-indigo-200/50 border border-indigo-500/30 transition-all hover:shadow-xl hover:scale-[1.01] relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">
               Total Balance
             </span>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center backdrop-blur-xs ring-1 ring-white/30">
               <Wallet className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               {formatCurrency(summary.totalBalance)}
             </h3>
-            <p className="mt-1 text-xs text-slate-400 font-medium">Available liquid funds</p>
+            <p className="mt-1 text-xs text-indigo-100/90 font-medium">Available liquid funds</p>
           </div>
         </div>
 

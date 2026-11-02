@@ -87,22 +87,18 @@ export const LoginView: React.FC = () => {
             {/* Divider */}
             <div className="relative flex items-center justify-center py-1">
               <div className="border-t border-slate-200 w-full" />
-              <span className="bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                or explore demo without login
+              <span className="bg-white px-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                or
               </span>
             </div>
 
-            {/* Explore Demo Mode Button */}
+            {/* Simple Explore Demo Button */}
             <button
               onClick={enterDemoMode}
-              className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 hover:from-indigo-700 hover:to-purple-700 active:scale-[0.99] text-white font-semibold rounded-2xl shadow-md shadow-indigo-200 hover:shadow-lg transition-all cursor-pointer text-sm group"
+              className="w-full flex items-center justify-center px-5 py-3 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-semibold rounded-2xl border border-slate-200 transition-colors cursor-pointer text-sm"
             >
-              <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
-              <span>Explore Demo Mode</span>
+              Explore Demo
             </button>
-            <p className="text-[11px] text-center text-slate-400 font-medium px-2 leading-relaxed">
-              Pre-loaded with September &amp; October transactions, ₹50k salary, rent, bills &amp; split groups.
-            </p>
           </div>
         </div>
 
